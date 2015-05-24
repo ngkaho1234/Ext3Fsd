@@ -1021,7 +1021,7 @@ static void ext4_ext_remove_blocks(void *icb,struct inode *inode, struct ext4_ex
 	ext4_fsblk_t start;
 	num = from - le32_to_cpu(ex->ee_block);
 	start = ext4_ext_pblock(ex) + num;
-	ext4_ext_free_blocks(icb, inode, start, num, 0);
+	ext4_ext_free_blocks(icb, inode, start, to - from, 0);
 }
 
 static int ext4_ext_remove_idx(void *icb,
