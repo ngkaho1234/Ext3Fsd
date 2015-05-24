@@ -538,7 +538,7 @@ Ext2ListExtents(PLARGE_MCB  Extents)
                     Extents, i, &DirtyVba,
                     &DirtyLba, &DirtyLength); i++)  {
             if (DirtyVba > 0 && DirtyLba != -1) {
-            DEBUG(DL_EXT, ("Vba:%I64xh Lba:%I64xh Len:%I64xh.\n", DirtyVba, DirtyLba, DirtyLength));
+                DEBUG(DL_EXT, ("Vba:%I64xh Lba:%I64xh Len:%I64xh.\n", DirtyVba, DirtyLba, DirtyLength));
                 n++;
             }
         }

@@ -472,7 +472,7 @@ Ext2ZeroBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
                 (PLARGE_INTEGER) (&Offset),
                 Size,
                 FALSE,
-                PIN_WAIT,
+                PIN_WAIT | PIN_EXCLUSIVE,
                 &Bcb,
                 &Buffer )) {
 
@@ -528,7 +528,7 @@ Ext2SaveBuffer( IN PEXT2_IRP_CONTEXT    IrpContext,
                     (PLARGE_INTEGER) (&Offset),
                     Length,
                     FALSE,
-                    PIN_WAIT,
+                    PIN_WAIT | PIN_EXCLUSIVE,
                     &Bcb,
                     &Buffer )) {
 
@@ -630,12 +630,27 @@ Again:
     }
 
     bitmap_blk = ext4_block_bitmap(sb, group_desc);
-    bh = sb_getblk(sb, bitmap_blk);
-    if (!bh) {
-        DbgBreak();
-        Status = STATUS_INSUFFICIENT_RESOURCES;
-        goto errorout;
+
+    if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
+        bh = sb_getblk_zero(sb, bitmap_blk);
+        if (!bh) {
+            DbgBreak();
+            Status = STATUS_INSUFFICIENT_RESOURCES;
+            goto errorout;
+        }
+        group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
+        ext4_init_block_bitmap(sb, bh, Group, group_desc);
+        set_buffer_uptodate(bh);
+        Ext2SaveGroup(IrpContext, Vcb, Group);
+    } else {
+        bh = sb_getblk(sb, bitmap_blk);
+        if (!bh) {
+            DbgBreak();
+            Status = STATUS_INSUFFICIENT_RESOURCES;
+            goto errorout;
+        }
     }
+
     if (!buffer_uptodate(bh)) {
 	    int err = bh_submit_read(bh);
 	    if (err < 0) {
@@ -643,11 +658,6 @@ Again:
 		    Status = Ext2WinntError(err);
 		    goto errorout;
 	    }
-    }
-
-    if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
-        ext4_init_block_bitmap(sb, bh, Group, group_desc);
-        set_buffer_uptodate(bh);
     }
 
     if (ext4_free_blks_count(sb, group_desc)) {
@@ -746,6 +756,14 @@ Again:
             goto Again;
         }
 
+        /* Always remove dirty MCB to prevent Volume's lazy writing.
+           Metadata blocks will be re-added during modifications.*/
+        if (Ext2RemoveBlockExtent(Vcb, NULL, *Block, *Number)) {
+        } else {
+            DbgBreak();
+            Ext2RemoveBlockExtent(Vcb, NULL, *Block, *Number);
+        }
+
         DEBUG(DL_INF, ("Ext2NewBlock:  Block %xh - %x allocated.\n",
                        *Block, *Block + *Number));
         Status = STATUS_SUCCESS;
@@ -797,8 +815,8 @@ Ext2FreeBlock(
 Again:
 
     if ( Block < EXT2_FIRST_DATA_BLOCK ||
-            Block >= TOTAL_BLOCKS ||
-            Group >= Vcb->sbi.s_groups_count) {
+         Block >= TOTAL_BLOCKS ||
+         Group >= Vcb->sbi.s_groups_count) {
 
         DbgBreak();
         Status = STATUS_SUCCESS;
@@ -867,6 +885,13 @@ Again:
         BitmapBcb = NULL;
         BitmapCache = NULL;
         Ext2SaveGroup(IrpContext, Vcb, Group);
+
+        /* remove dirty MCB to prevent Volume's lazy writing. */
+        if (Ext2RemoveBlockExtent(Vcb, NULL, Block, Count)) {
+        } else {
+            DbgBreak();
+            Ext2RemoveBlockExtent(Vcb, NULL, Block, Count);
+        }
 
         /* save super block (used/unused blocks statics) */
         Ext2UpdateVcbStat(IrpContext, Vcb);
@@ -1086,12 +1111,26 @@ repeat:
         goto errorout;
     }
 
-    bh = sb_getblk(sb, bitmap_blk);
-    if (!bh) {
-        DbgBreak();
-        Status = STATUS_INSUFFICIENT_RESOURCES;
-        goto errorout;
+    if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_INODE_UNINIT)) {
+        bh = sb_getblk_zero(sb, bitmap_blk);
+        if (!bh) {
+            DbgBreak();
+            Status = STATUS_INSUFFICIENT_RESOURCES;
+            goto errorout;
+        }
+        group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
+        ext4_init_inode_bitmap(sb, bh, Group, group_desc);
+        set_buffer_uptodate(bh);
+        Ext2SaveGroup(IrpContext, Vcb, Group);
+    } else {
+        bh = sb_getblk(sb, bitmap_blk);
+        if (!bh) {
+            DbgBreak();
+            Status = STATUS_INSUFFICIENT_RESOURCES;
+            goto errorout;
+        }
     }
+
     if (!buffer_uptodate(bh)) {
 	    int err = bh_submit_read(bh);
 	    if (err < 0) {
@@ -1099,11 +1138,6 @@ repeat:
 		    Status = Ext2WinntError(err);
 		    goto errorout;
 	    }
-    }
-
-    if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_INODE_UNINIT)) {
-        ext4_init_inode_bitmap(sb, bh, Group, group_desc);
-        set_buffer_uptodate(bh);
     }
 
     if (Vcb->sbi.s_groups_count == 1) {
@@ -1179,18 +1213,19 @@ repeat:
             /* We may have to initialize the block bitmap if it isn't already */
             if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
 
-                struct buffer_head *block_bitmap_bh;
+                struct buffer_head *block_bitmap_bh = NULL;
 
                 /* recheck and clear flag under lock if we still need to */
-                block_bitmap_bh = sb_getblk(sb, ext4_block_bitmap(sb, group_desc));
-                if (block_bitmap_bh && group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
-                    group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
-                    free = ext4_init_block_bitmap(sb, block_bitmap_bh, Group, group_desc);
-                    group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
-                    ext4_free_blks_set(sb, group_desc, free);
+                if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
+                    block_bitmap_bh = sb_getblk_zero(sb, ext4_block_bitmap(sb, group_desc));
+                    if (block_bitmap_bh) {
+                        group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
+                        free = ext4_init_block_bitmap(sb, block_bitmap_bh, Group, group_desc);
+                        group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
+                        ext4_free_blks_set(sb, group_desc, free);
+                        brelse(block_bitmap_bh);
+                    }
                 }
-                if (block_bitmap_bh)
-                    brelse(block_bitmap_bh);
             }
 
         }

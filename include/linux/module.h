@@ -825,6 +825,8 @@ int fsync_super(struct super_block *);
 int fsync_no_super(struct block_device *);
 struct buffer_head *__find_get_block(struct block_device *bdev, sector_t block,
                                                  unsigned long size);
+struct buffer_head *get_block_bh(struct block_device *bdev, sector_t block,
+                                 unsigned long size, int zero);
 struct buffer_head *__getblk(struct block_device *bdev, sector_t block,
                                          unsigned long size);
 void __brelse(struct buffer_head *);
@@ -844,15 +846,10 @@ void write_boundary_block(struct block_device *bdev,
 int bh_uptodate_or_lock(struct buffer_head *bh);
 int bh_submit_read(struct buffer_head *bh);
 /* They are separately managed  */
-PPUBLIC_BCB 
-extents_bread(struct super_block *sb, sector_t block, PVOID *pdata);
-
-PPUBLIC_BCB 
-extents_bwrite(struct super_block *sb, sector_t block, PVOID *pdata);
-
-void extents_mark_buffer_dirty(struct super_block *sb, PPUBLIC_BCB Bcb);
-
-void extents_brelse(PPUBLIC_BCB Bcb);
+struct buffer_head *extents_bread(struct super_block *sb, sector_t block);
+struct buffer_head *extents_bwrite(struct super_block *sb, sector_t block);
+void extents_mark_buffer_dirty(struct buffer_head *bh);
+void extents_brelse(struct buffer_head *bh);
 
 extern int buffer_heads_over_limit;
 
@@ -944,7 +941,13 @@ static inline void bforget(struct buffer_head *bh)
 static inline struct buffer_head *
             sb_getblk(struct super_block *sb, sector_t block)
 {
-    return __getblk(sb->s_bdev, block, sb->s_blocksize);
+    return get_block_bh(sb->s_bdev, block, sb->s_blocksize, 0);
+}
+
+static inline struct buffer_head *
+            sb_getblk_zero(struct super_block *sb, sector_t block)
+{
+    return get_block_bh(sb->s_bdev, block, sb->s_blocksize, 1);
 }
 
 static inline struct buffer_head *
