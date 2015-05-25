@@ -1016,12 +1016,12 @@ out:
 static void ext4_ext_remove_blocks(void *icb,struct inode *inode, struct ext4_extent *ex,
 				ext4_lblk_t from, ext4_lblk_t to)
 {
-	int len = to - from;
+	int len = to - from + 1;
 	ext4_lblk_t num;
 	ext4_fsblk_t start;
 	num = from - le32_to_cpu(ex->ee_block);
 	start = ext4_ext_pblock(ex) + num;
-	ext4_ext_free_blocks(icb, inode, start, to - from, 0);
+	ext4_ext_free_blocks(icb, inode, start, len, 0);
 }
 
 static int ext4_ext_remove_idx(void *icb,
