@@ -641,6 +641,7 @@ Again:
         group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
         ext4_init_block_bitmap(sb, bh, Group, group_desc);
         set_buffer_uptodate(bh);
+        group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
         Ext2SaveGroup(IrpContext, Vcb, Group);
     } else {
         bh = sb_getblk(sb, bitmap_blk);
@@ -729,9 +730,6 @@ Again:
 
         /* set block bitmap dirty in cache */
         mark_buffer_dirty(bh);
-
-        if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT))
-            group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
 
         /* update group description */
         ext4_free_blks_set(sb, group_desc, RtlNumberOfClearBits(&BlockBitmap));
@@ -1016,6 +1014,7 @@ repeat:
                         ext4_free_inodes_count(sb, group_desc)) {
                         Group = j + 1;
                         group_desc = desc;
+                        break;
                     }
                 }
             }
@@ -1121,6 +1120,7 @@ repeat:
         group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
         ext4_init_inode_bitmap(sb, bh, Group, group_desc);
         set_buffer_uptodate(bh);
+        group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_INODE_UNINIT);
         Ext2SaveGroup(IrpContext, Vcb, Group);
     } else {
         bh = sb_getblk(sb, bitmap_blk);
@@ -1216,18 +1216,17 @@ repeat:
                 struct buffer_head *block_bitmap_bh = NULL;
 
                 /* recheck and clear flag under lock if we still need to */
-                if (group_desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
-                    block_bitmap_bh = sb_getblk_zero(sb, ext4_block_bitmap(sb, group_desc));
-                    if (block_bitmap_bh) {
-                        group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
-                        free = ext4_init_block_bitmap(sb, block_bitmap_bh, Group, group_desc);
-                        group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
-                        ext4_free_blks_set(sb, group_desc, free);
-                        brelse(block_bitmap_bh);
-                    }
+                block_bitmap_bh = sb_getblk_zero(sb, ext4_block_bitmap(sb, group_desc));
+                if (block_bitmap_bh) {
+                    group_desc->bg_checksum = ext4_group_desc_csum(EXT3_SB(sb), Group, group_desc);
+                    free = ext4_init_block_bitmap(sb, block_bitmap_bh, Group, group_desc);
+                    set_buffer_uptodate(bh);
+                    brelse(block_bitmap_bh);
+                    group_desc->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
+                    ext4_free_blks_set(sb, group_desc, free);
+                    Ext2SaveGroup(IrpContext, Vcb, Group);
                 }
             }
-
         }
 
         *Inode = dwInode + 1 + Group * INODES_PER_GROUP;
