@@ -1168,7 +1168,8 @@ int __ext4_ext_remove_space(void *icb,
 			first_ex = EXT_FIRST_EXTENT(eh);
 			last_ex = EXT_LAST_EXTENT(eh);
 			leaf_from = le32_to_cpu(first_ex->ee_block);
-			leaf_to = le32_to_cpu(last_ex->ee_block);
+			leaf_to = le32_to_cpu(last_ex->ee_block)
+				+ ext4_ext_get_actual_len(last_ex) - 1;
 			if (leaf_from < from)
 				leaf_from = from;
 
