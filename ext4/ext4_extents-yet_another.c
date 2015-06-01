@@ -1002,9 +1002,12 @@ out:
 		if (*ppath)
 			ext4_ext_drop_refs(*ppath);
 
-		if (newblocks)
-			while (depth > 0)
-				ext4_ext_free_blocks(icb, inode, newblocks[--depth], 1, 0);
+		while (level >= 0 && newblocks) {
+			if (newblocks[level])
+				ext4_ext_free_blocks(inode, newblocks[level], 1, 0);
+
+			level--;
+		}
 
 		*ppath = NULL;
 	}
