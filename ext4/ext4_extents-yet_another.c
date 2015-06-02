@@ -1004,7 +1004,7 @@ out:
 
 		while (level >= 0 && newblocks) {
 			if (newblocks[level])
-				ext4_ext_free_blocks(inode, newblocks[level], 1, 0);
+				ext4_ext_free_blocks(icb, inode, newblocks[level], 1, 0);
 
 			level--;
 		}
