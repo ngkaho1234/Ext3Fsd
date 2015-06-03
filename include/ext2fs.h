@@ -109,6 +109,8 @@ typedef struct ext3_dir_entry_2 EXT2_DIR_ENTRY2, *PEXT2_DIR_ENTRY2;
 #define WRITING_SUPPORT     L"WritingSupport"
 #define CHECKING_BITMAP     L"CheckingBitmap"
 #define EXT3_FORCEWRITING   L"Ext3ForceWriting"
+#define MOUNTAS_UID         L"MountAsUid"
+#define MOUNTAS_GID         L"MountAsGid"
 #define CODEPAGE_NAME       L"CodePage"
 #define HIDING_PREFIX       L"HidingPrefix"
 #define HIDING_SUFFIX       L"HidingSuffix"
@@ -362,9 +364,21 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 #define Ext2SetOwnerReadOnly(m) do {(m) &= ~S_IWUSR;} while(0)
 
 #define Ext2IsOwnerWritable(m)  (((m) & S_IWUSR) == S_IWUSR)
-#define Ext2IsOwnerReadOnly(m)  (!(Ext2IsOwnerWritable(m)))
+#define Ext2IsOwnerReadable(m)  (((m) & S_IRUSR) == S_IRUSR)
+#define Ext2IsOwnerReadOnly(m)  (!(Ext2IsOwnerWritable(m)) && Ext2IsOwnerReadable(m))
+
+#define Ext2IsGroupWritable(m)  (((m) & S_IWGRP) == S_IWGRP)
+#define Ext2IsGroupReadable(m)  (((m) & S_IRGRP) == S_IRGRP)
+#define Ext2IsGroupReadOnly(m)  (!(Ext2IsGroupWritable(m)) && Ext2IsGroupReadable(m))
+
+#define Ext2IsOtherWritable(m)  (((m) & S_IWOTH) == S_IWOTH)
+#define Ext2IsOtherReadable(m)  (((m) & S_IROTH) == S_IROTH)
+#define Ext2IsOtherReadOnly(m)  (!(Ext2IsOtherWritable(m)) && Ext2IsOtherWritable(m))
 
 #define Ext2SetReadOnly(m) do {(m) &= ~(S_IWUSR | S_IWGRP | S_IWOTH);} while(0)
+    
+#define Ext2FileCanRead 0x1
+#define Ext2FileCanWrite 0x2
 
 /*
  * We need 8-bytes aligned for all the sturctures
@@ -428,6 +442,12 @@ typedef PVOID   PBCB;
 //
 
 typedef struct _EXT2_GLOBAL {
+
+    /* Mount as a specific Uid. */
+    ULONG                       MountAsUid;
+    
+    /* Mount as a specific Gid. */
+    ULONG                       MountAsGid;
 
     /* Identifier for this structure */
     EXT2_IDENTIFIER             Identifier;

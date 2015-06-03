@@ -58,4 +58,5 @@ SOURCES=    ..\Ext3fsd.rc   \
             ..\flush.c      \
             ..\shutdown.c   \
             ..\nls.c        \
+            ..\unix_perm.c        \
             ..\linux.c

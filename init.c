@@ -182,6 +182,43 @@ Ext2QueryGlobalParameters( IN PUNICODE_STRING  RegistryPath)
 
     DEBUG(DL_ERR, ( "Ext2QueryParameters: Ext3ForceWriting=%xh\n", Ext3ForceWriting));
 
+    /* querying value of MountAsUid */
+    RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
+    QueryTable[0].Flags = RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_REQUIRED;
+    QueryTable[0].Name = MOUNTAS_UID;
+    QueryTable[0].EntryContext = &Ext2Global->MountAsUid;
+
+    Status = RtlQueryRegistryValues(
+                 RTL_REGISTRY_ABSOLUTE,
+                 ParameterPath.Buffer,
+                 &QueryTable[0],
+                 NULL,
+                 NULL        );
+                 
+    if (!NT_SUCCESS(Status)) {
+        Ext2Global->MountAsUid = 0;
+    }
+
+    DEBUG(DL_ERR, ( "Ext2QueryParameters: MountAsUid=%xh\n", Ext2Global->MountAsUid));
+    
+    /* querying value of MountAsGid */
+    RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
+    QueryTable[0].Flags = RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_REQUIRED;
+    QueryTable[0].Name = MOUNTAS_GID;
+    QueryTable[0].EntryContext = &Ext2Global->MountAsGid;
+
+    Status = RtlQueryRegistryValues(
+                 RTL_REGISTRY_ABSOLUTE,
+                 ParameterPath.Buffer,
+                 &QueryTable[0],
+                 NULL,
+                 NULL        );
+                 
+    if (!NT_SUCCESS(Status)) {
+        Ext2Global->MountAsGid = 0;
+    }
+
+    DEBUG(DL_ERR, ( "Ext2QueryParameters: MountAsGid=%xh\n", Ext2Global->MountAsGid));
 
     /* querying value of AutoMount */
     RtlZeroMemory(&QueryTable[0], sizeof(RTL_QUERY_REGISTRY_TABLE) * 2);
