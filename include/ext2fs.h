@@ -373,7 +373,7 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 
 #define Ext2IsOtherWritable(m)  (((m) & S_IWOTH) == S_IWOTH)
 #define Ext2IsOtherReadable(m)  (((m) & S_IROTH) == S_IROTH)
-#define Ext2IsOtherReadOnly(m)  (!(Ext2IsOtherWritable(m)) && Ext2IsOtherWritable(m))
+#define Ext2IsOtherReadOnly(m)  (!(Ext2IsOtherWritable(m)) && Ext2IsOtherReadable(m))
 
 #define Ext2SetReadOnly(m) do {(m) &= ~(S_IWUSR | S_IWGRP | S_IWOTH);} while(0)
     
