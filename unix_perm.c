@@ -14,11 +14,13 @@ int Ext2CheckPermission(PEXT2_MCB Mcb)
             Permission = Ext2FileCanRead;
         else if (Ext2IsGroupWritable(Mcb->Inode.i_mode))
             Permission = Ext2FileCanRead | Ext2FileCanWrite;
+
     } else {
         if (Ext2IsOtherReadOnly(Mcb->Inode.i_mode))
             Permission = Ext2FileCanRead;
         else if (Ext2IsOtherWritable(Mcb->Inode.i_mode))
             Permission = Ext2FileCanRead | Ext2FileCanWrite;
+
     }
     return Permission;
 }
