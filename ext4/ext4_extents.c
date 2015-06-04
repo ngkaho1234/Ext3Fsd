@@ -1886,14 +1886,14 @@ static int ext4_remove_blocks(void *icb, handle_t *handle, struct inode *inode,
 	int i;
 
 	if (from >= le32_to_cpu(ex->ee_block)
-			&& to == le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len) - 1) {
+			&& to == le32_to_cpu(ex->ee_block) + ext4_ext_get_actual_len(ex) - 1) {
 		/* tail removal */
 		unsigned long num, start;
-		num = le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len) - from;
-		start = ext4_ext_pblock(ex) + le16_to_cpu(ex->ee_len) - num;
+		num = le32_to_cpu(ex->ee_block) + ext4_ext_get_actual_len(ex) - from;
+		start = ext4_ext_pblock(ex) + ext4_ext_get_actual_len(ex) - num;
 		ext4_free_blocks(icb, handle, inode, NULL, start, num, 0);
 	} else if (from == le32_to_cpu(ex->ee_block)
-			&& to <= le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len) - 1) {
+			&& to <= le32_to_cpu(ex->ee_block) + ext4_ext_get_actual_len(ex) - 1) {
 	} else {
 	}
 	return 0;
@@ -1945,7 +1945,7 @@ ext4_ext_rm_leaf(void *icb, handle_t *handle, struct inode *inode,
 	ex = EXT_LAST_EXTENT(eh);
 
 	ex_ee_block = le32_to_cpu(ex->ee_block);
-	ex_ee_len = le16_to_cpu(ex->ee_len);
+	ex_ee_len = ext4_ext_get_actual_len(ex);
 
 	while (ex >= EXT_FIRST_EXTENT(eh) &&
 			ex_ee_block + ex_ee_len > start) {
@@ -2015,7 +2015,7 @@ ext4_ext_rm_leaf(void *icb, handle_t *handle, struct inode *inode,
 
 		ex--;
 		ex_ee_block = le32_to_cpu(ex->ee_block);
-		ex_ee_len = le16_to_cpu(ex->ee_len);
+		ex_ee_len = ext4_ext_get_actual_len(ex);
 	}
 
 	if (correct_index && eh->eh_entries)
@@ -2167,6 +2167,21 @@ fix_extent_len:
 	ex->ee_len = orig_ex.ee_len;
 	ext4_ext_dirty(icb, handle, inode, path + path->p_depth);
 	return err;
+}
+
+static int ext4_ext_convert_to_initialized(
+		void *icb, handle_t *handle,
+		struct inode *inode,
+		struct ext4_ext_path **ppath,
+		ext4_lblk_t split,
+		int flags)
+{
+	return ext4_split_extent_at(icb, handle,
+			inode,
+			ppath,
+			split,
+			0,
+			flags);
 }
 
 /*
@@ -2355,10 +2370,20 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	if ((ex = path[depth].p_ext)) {
 		ext4_lblk_t ee_block = le32_to_cpu(ex->ee_block);
 		ext4_fsblk_t ee_start = ext4_ext_pblock(ex);
-		unsigned short ee_len  = le16_to_cpu(ex->ee_len);
+		unsigned short ee_len  = ext4_ext_get_actual_len(ex);
 		/* if found exent covers block, simple return it */
 		if (iblock >= ee_block && iblock < ee_block + ee_len) {
-			ASSERT(!ext4_ext_is_unwritten(ex));
+			if (ext4_ext_is_unwritten(ex)) {
+				err = ext4_ext_convert_to_initialized(icb, handle,
+						inode,
+						&path,
+						le32_to_cpu(ex->ee_block),
+						0);
+				if (err)
+					goto out2;
+
+			}
+
 			newblock = iblock - ee_block + ee_start;
 			/* number of remain blocks in the extent */
 			allocated = ee_len - (iblock - ee_block);
@@ -2376,7 +2401,6 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 
 	/* find next allocated block so that we know how many
 	 * blocks we can allocate without ovelapping next extent */
-	/*BUG_ON(iblock < le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len));*/
 	next = ext4_ext_next_allocated_block(path);
 	BUG_ON(next <= iblock);
 	allocated = next - iblock;
