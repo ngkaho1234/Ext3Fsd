@@ -2169,21 +2169,6 @@ fix_extent_len:
 	return err;
 }
 
-static int ext4_ext_convert_to_initialized(
-		void *icb, handle_t *handle,
-		struct inode *inode,
-		struct ext4_ext_path **ppath,
-		ext4_lblk_t split,
-		int flags)
-{
-	return ext4_split_extent_at(icb, handle,
-			inode,
-			ppath,
-			split,
-			0,
-			flags);
-}
-
 /*
  * returns 1 if current index have to be freed (even partial)
  */
@@ -2337,9 +2322,51 @@ void ext4_ext_init(struct super_block *sb)
 	 */
 }
 
+static int ext4_ext_convert_to_initialized (
+		void *icb,
+		handle_t *handle,
+		struct inode *inode,
+		struct ext4_ext_path **ppath,
+		ext4_lblk_t split,
+		unsigned long blocks,
+		int flags)
+{
+	int depth = ext_depth(inode), err;
+	struct ext4_extent *ex = (*ppath)[depth].p_ext;
+
+	assert (le32_to_cpu(ex->ee_block) <= split);
+
+	if (split + blocks == le32_to_cpu(ex->ee_block) + 
+						  ext4_ext_get_actual_len(ex)) {
+
+		/* split and initialize right part */
+		err = ext4_split_extent_at(icb, handle, inode, ppath, split,
+								   EXT4_EXT_MARK_UNWRIT1, flags);
+
+	} else if (le32_to_cpu(ex->ee_block) == split) {
+
+		/* split and initialize left part */
+		err = ext4_split_extent_at(icb, handle, inode, ppath, split + blocks,
+								   EXT4_EXT_MARK_UNWRIT2, flags);
+
+	} else {
+
+		/* split 1 extent to 3 and initialize the 2nd */
+		err = ext4_split_extent_at(icb, handle, inode, ppath, split + blocks,
+								   EXT4_EXT_MARK_UNWRIT1 |
+								   EXT4_EXT_MARK_UNWRIT2, flags);
+		if (0 == err) {
+			err = ext4_split_extent_at(icb, handle, inode, ppath, split,
+									   EXT4_EXT_MARK_UNWRIT1, flags);
+		}
+	}
+
+	return err;
+}
+
 int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_fsblk_t iblock,
 		unsigned long max_blocks, struct buffer_head *bh_result,
-		int create, int extend_disksize)
+		int create, int flags)
 {
 	struct ext4_ext_path *path = NULL;
 	struct ext4_extent newex, *ex;
@@ -2373,25 +2400,29 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 		unsigned short ee_len  = ext4_ext_get_actual_len(ex);
 		/* if found exent covers block, simple return it */
 		if (iblock >= ee_block && iblock < ee_block + ee_len) {
-			if (ext4_ext_is_unwritten(ex) && create) {
-				err = ext4_ext_convert_to_initialized(icb, handle,
-						inode,
-						&path,
-						le32_to_cpu(ex->ee_block),
-						0);
-				if (err)
-					goto out2;
-
-				newblock = iblock - ee_block + ee_start;
-			} else {
-				if (ext4_ext_is_unwritten(ex))
-					newblock = 0;
-				else
-					newblock = iblock - ee_block + ee_start;
-			}
 
 			/* number of remain blocks in the extent */
-			allocated = ee_len - (iblock - ee_block);
+			allocated = ee_len + ee_block - iblock;
+
+			if (ext4_ext_is_unwritten(ex)) {
+				if (create) {
+					newblock = iblock - ee_block + ee_start;
+					err = ext4_ext_convert_to_initialized (
+							icb, handle,
+							inode,
+							&path,
+							iblock,
+							allocated,
+							flags);
+					if (err)
+						goto out2;
+
+				} else {
+					newblock = 0;
+				}
+			} else {
+				newblock = iblock - ee_block + ee_start;
+			}
 			goto out;
 		}
 	}
@@ -2406,6 +2437,7 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 
 	/* find next allocated block so that we know how many
 	 * blocks we can allocate without ovelapping next extent */
+	/*BUG_ON(iblock < le32_to_cpu(ex->ee_block) + le16_to_cpu(ex->ee_len));*/
 	next = ext4_ext_next_allocated_block(path);
 	BUG_ON(next <= iblock);
 	allocated = next - iblock;
@@ -2423,6 +2455,11 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	newex.ee_block = cpu_to_le32(iblock);
 	ext4_ext_store_pblock(&newex, newblock);
 	newex.ee_len = cpu_to_le16(allocated);
+	/* if it's fallocate, mark ex as unwritten */
+	if (flags & EXT4_GET_BLOCKS_PRE_IO &&
+		flags & EXT4_GET_BLOCKS_CREATE_UNWRIT_EXT) {
+		ext4_ext_mark_unwritten(&newex);
+	}
 	err = ext4_ext_insert_extent(icb, handle, inode, &path, &newex, 0);
 	if (err) {
 		/* free data blocks we just allocated */
@@ -2434,7 +2471,11 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	ext4_mark_inode_dirty(icb, handle, inode);
 
 	/* previous routine could use block we allocated */
-	newblock = ext4_ext_pblock(&newex);
+	if (ext4_ext_is_unwritten(&newex)) {
+		newblock = 0;
+	} else {
+		newblock = ext4_ext_pblock(&newex);
+	}
 	set_buffer_new(bh_result);
 
 out:

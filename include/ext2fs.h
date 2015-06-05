@@ -49,7 +49,11 @@
 
 // To support driver dynamics unload
 
-#define EXT2_UNLOAD     FALSE
+#define EXT2_UNLOAD                     FALSE
+
+// To support inode size expansion (fallocate)
+
+#define EXT2_PRE_ALLOCATION_SUPPORT     TRUE
 
 //
 // Constants
