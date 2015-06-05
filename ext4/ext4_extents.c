@@ -2373,7 +2373,7 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 		unsigned short ee_len  = ext4_ext_get_actual_len(ex);
 		/* if found exent covers block, simple return it */
 		if (iblock >= ee_block && iblock < ee_block + ee_len) {
-			if (ext4_ext_is_unwritten(ex)) {
+			if (ext4_ext_is_unwritten(ex) && create) {
 				err = ext4_ext_convert_to_initialized(icb, handle,
 						inode,
 						&path,
@@ -2382,9 +2382,14 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 				if (err)
 					goto out2;
 
+				newblock = iblock - ee_block + ee_start;
+			} else {
+				if (ext4_ext_is_unwritten(ex))
+					newblock = 0;
+				else
+					newblock = iblock - ee_block + ee_start;
 			}
 
-			newblock = iblock - ee_block + ee_start;
 			/* number of remain blocks in the extent */
 			allocated = ee_len - (iblock - ee_block);
 			goto out;
