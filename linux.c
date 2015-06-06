@@ -412,9 +412,10 @@ static struct buffer_head *__buffer_search(struct rb_root *root,
 static int buffer_blocknr_cmp(struct rb_node *a, struct rb_node *b)
 {
     struct buffer_head *a_bh, *b_bh;
-    s64 result = a_bh->b_blocknr - b_bh->b_blocknr;
+    s64 result;
     a_bh = container_of(a, struct buffer_head, b_rb_node);
     b_bh = container_of(b, struct buffer_head, b_rb_node);
+    result = a_bh->b_blocknr - b_bh->b_blocknr;
 
     if (result < 0)
         return -1;
