@@ -411,7 +411,7 @@ static struct buffer_head *buffer_head_search(struct block_device *bdev,
 
 static void buffer_head_insert(struct block_device *bdev, struct buffer_head *bh)
 {
-    rb_insert(&bdev->bd_bh_root, &bh->b_rb_node, buffer_blocknr_cmp);
+    rb_insert(&bdev->bd_bh_root, &bh->b_rb_node, buffer_head_blocknr_cmp);
 }
 
 static void buffer_head_remove(struct block_device *bdev, struct buffer_head *bh)
