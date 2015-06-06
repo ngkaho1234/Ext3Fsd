@@ -1247,6 +1247,64 @@ int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start)
     return __ext4_ext_remove_space(icb, inode, start, (ext4_lblk_t)-1);
 }
 
+int ext4_ext_split_extent_at(void *icb,
+			     struct inode *inode,
+			     struct ext4_ext_path **ppath,
+			     ext4_lblk_t split,
+			     int split_flag,
+			     int flags)
+{
+	struct ext4_extent *ex, newex;
+	ext4_fsblk_t newblock;
+	ext4_lblk_t ee_block;
+	int ee_len;
+	int depth = ext_depth(inode);
+	int err = 0;
+
+	ex = (*ppath)[depth].p_ext;
+	ee_block = le32_to_cpu(ex->ee_block);
+	ee_len = ext4_ext_get_actual_len(ex);
+	
+	if (split == ee_block) {
+		/*
+		 * case b: block @split is the block that the extent begins with
+		 * then we just change the state of the extent, and splitting
+		 * is not needed.
+		 */
+		if (split_flag & EXT4_EXT_MARK_UNWRIT2)
+			ext4_ext_mark_unwritten(ex);
+		else
+			ext4_ext_mark_initialized(ex);
+
+		err = __ext4_ext_dirty(icb, inode, *ppath + depth);
+		goto out;
+	}
+
+	ex->ee_len = cpu_to_le16(split - ee_block);
+	if (split_flag & EXT4_EXT_MARK_UNWRIT1)
+		ext4_ext_mark_unwritten(ex);
+
+	err = __ext4_ext_dirty(icb, inode, *ppath + depth);
+	if (err)
+		goto out;
+
+	newex.ee_block = cpu_to_le32(split);
+	newex.ee_len   = cpu_to_le16(ee_len - (split - ee_block));
+	ext4_ext_store_pblock(&newex, newblock);
+	if (split_flag & EXT4_EXT_MARK_UNWRIT2)
+		ext4_ext_mark_unwritten(&newex);
+	err = ext4_ext_insert_extent(icb, inode, ppath, &newex);
+	if (err)
+		goto restore_extent_len;
+
+out:
+	return err;
+restore_extent_len:
+	ex->ee_len = cpu_to_le16(ee_len);
+	err = __ext4_ext_dirty(icb, inode, *ppath + depth);
+	return err;
+}
+
 int ext4_ext_tree_init(void *icb, handle_t *v, struct inode *inode)
 {
 	struct ext4_extent_header *eh;
