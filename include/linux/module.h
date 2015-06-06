@@ -533,6 +533,9 @@ struct timer_list {
 
 typedef struct kmem_cache kmem_cache_t;
 
+struct rb_root;
+struct rb_node;
+
 struct block_device {
 
     unsigned long           bd_flags;   /* flags */
