@@ -548,7 +548,7 @@ struct block_device {
 
     spinlock_t              bd_bh_lock;    /**/
     kmem_cache_t *          bd_bh_cache;   /* memory cache for buffer_head */
-    struct rb_root *        bd_bh_root;    /* buffer_head red-black tree root */
+    struct rb_root          bd_bh_root;    /* buffer_head red-black tree root */
 };
 
 //
