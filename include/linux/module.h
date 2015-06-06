@@ -720,7 +720,6 @@ struct buffer_head {
     // struct list_head b_assoc_buffers;    /* associated with another mapping */
     // struct address_space *b_assoc_map;   /* mapping this buffer is associated with */
     atomic_t b_count;		                /* users using this buffer_head */
-    struct list_head b_list;                /* list entry */
     struct rb_node b_rb_node;                /* Red-black tree node entry */
 };
 
