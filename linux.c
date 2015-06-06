@@ -462,7 +462,7 @@ get_block_bh(
     struct list_head *entry;
 
     /* allocate buffer_head and initialize it */
-    struct buffer_head * bh = NULL, tbh = NULL;
+    struct buffer_head *bh = NULL, *tbh = NULL;
 
     /* check the block is valid or not */
     if (block >= TOTAL_BLOCKS) {
