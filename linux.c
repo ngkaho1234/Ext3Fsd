@@ -374,7 +374,7 @@ void rb_insert(struct rb_root *root, struct rb_node *node,
         parent = *new;
         if (result < 0)
             new = &((*new)->rb_left);
-        else if (result > 0) {
+        else if (result > 0)
             new = &((*new)->rb_right);
         else
             return;
@@ -546,7 +546,7 @@ again:
         spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
         goto errorout;
     } else
-        buffer_insert(bdev, bh, block);
+        buffer_insert(bdev, bh);
 
     spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
 
