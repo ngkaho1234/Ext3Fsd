@@ -362,31 +362,8 @@ free_buffer_head(struct buffer_head * bh)
 //
 // Red-black tree insert routine.
 //
-void rb_insert(struct rb_root *root, struct rb_node *node,
-         int (*cmp)(struct rb_node *, struct rb_node *))
-{
-    struct rb_node **new = &(root->rb_node), *parent = NULL;
 
-    /* Figure out where to put new node */
-    while (*new) {
-        int result = cmp(node, *new);
-
-        parent = *new;
-        if (result < 0)
-            new = &((*new)->rb_left);
-        else if (result > 0)
-            new = &((*new)->rb_right);
-        else
-            return;
-
-    }
-
-    /* Add new node and rebalance tree. */
-    rb_link_node(node, parent, new);
-    rb_insert_color(node, root);
-}
-
-static struct buffer_head *__buffer_search(struct rb_root *root,
+static struct buffer_head *__buffer_head_search(struct rb_root *root,
                        sector_t blocknr)
 {
     struct rb_node *new = root->rb_node;
@@ -409,7 +386,7 @@ static struct buffer_head *__buffer_search(struct rb_root *root,
     return NULL;
 }
 
-static int buffer_blocknr_cmp(struct rb_node *a, struct rb_node *b)
+static int buffer_head_blocknr_cmp(struct rb_node *a, struct rb_node *b)
 {
     struct buffer_head *a_bh, *b_bh;
     s64 result;
@@ -424,20 +401,20 @@ static int buffer_blocknr_cmp(struct rb_node *a, struct rb_node *b)
     return 0;
 }
 
-static struct buffer_head *buffer_search(struct block_device *bdev,
+static struct buffer_head *buffer_head_search(struct block_device *bdev,
                      sector_t blocknr)
 {
     struct rb_root *root;
     root = &bdev->bd_bh_root;
-    return __buffer_search(root, blocknr);
+    return __buffer_head_search(root, blocknr);
 }
 
-static void buffer_insert(struct block_device *bdev, struct buffer_head *bh)
+static void buffer_head_insert(struct block_device *bdev, struct buffer_head *bh)
 {
     rb_insert(&bdev->bd_bh_root, &bh->b_rb_node, buffer_blocknr_cmp);
 }
 
-static void buffer_remove(struct block_device *bdev, struct buffer_head *bh)
+static void buffer_head_remove(struct block_device *bdev, struct buffer_head *bh)
 {
     rb_erase(&bh->b_rb_node, &bdev->bd_bh_root);
 }
@@ -469,7 +446,7 @@ get_block_bh(
 
     /* search the bdev bh list */
     spin_lock_irqsave(&bdev->bd_bh_lock, irql);
-    tbh = buffer_search(bdev, block);
+    tbh = buffer_head_search(bdev, block);
     if (tbh) {
         bh = tbh;
         get_bh(bh);
@@ -540,7 +517,7 @@ again:
     spin_lock_irqsave(&bdev->bd_bh_lock, irql);
 
     /* do search again here */
-    tbh = buffer_search(bdev, block);
+    tbh = buffer_head_search(bdev, block);
     if (tbh) {
         free_buffer_head(bh);
         bh = tbh;
@@ -548,7 +525,7 @@ again:
         spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
         goto errorout;
     } else
-        buffer_insert(bdev, bh);
+        buffer_head_insert(bdev, bh);
 
     spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
 
@@ -648,7 +625,7 @@ void __brelse(struct buffer_head *bh)
         spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
         return;
     }
-    buffer_remove(bdev, bh);
+    buffer_head_remove(bdev, bh);
     spin_unlock_irqrestore(&bdev->bd_bh_lock, irql);
 
     DEBUG(DL_BH, ("brelse: cnt=%u size=%u blk=%10.10xh bh=%p ptr=%p\n",
