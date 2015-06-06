@@ -395,7 +395,7 @@ static struct buffer_head *__buffer_search(struct rb_root *root,
     while (new) {
         struct buffer_head *bh =
             container_of(new, struct buffer_head, b_rb_node);
-        sector_t result = blocknr - bh->b_blocknr;
+        int64_t result = blocknr - bh->b_blocknr;
 
         if (result < 0)
             new = new->rb_left;
@@ -412,7 +412,7 @@ static struct buffer_head *__buffer_search(struct rb_root *root,
 static int buffer_blocknr_cmp(struct rb_node *a, struct rb_node *b)
 {
     struct buffer_head *a_bh, *b_bh;
-    sector_t result = a_bh->b_blocknr - b_bh->b_blocknr;
+    int64_t result = a_bh->b_blocknr - b_bh->b_blocknr;
     a_bh = container_of(a, struct buffer_head, b_rb_node);
     b_bh = container_of(b, struct buffer_head, b_rb_node);
 
