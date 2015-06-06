@@ -366,28 +366,22 @@ void rb_insert(struct rb_root *root, struct rb_node *node,
          int (*cmp)(struct rb_node *, struct rb_node *))
 {
     struct rb_node **new = &(root->rb_node), *parent = NULL;
-    int leftmost = 1, rightmost = 1;
 
     /* Figure out where to put new node */
     while (*new) {
         int result = cmp(node, *new);
 
         parent = *new;
-        if (result < 0) {
-            rightmost = 0;
+        if (result < 0)
             new = &((*new)->rb_left);
-        } else if (result > 0) {
-            leftmost = 0;
+        else if (result > 0) {
             new = &((*new)->rb_right);
-        } else
+        else
             return;
+
     }
 
     /* Add new node and rebalance tree. */
-    if (rightmost)
-        root->rb_rightmost = node;
-    if (leftmost)
-        root->rb_leftmost = node;
     rb_link_node(node, parent, new);
     rb_insert_color(node, root);
 }
@@ -409,6 +403,7 @@ static struct buffer_head *__buffer_search(struct rb_root *root,
             new = new->rb_right;
         else
             return bh;
+
     }
 
     return NULL;
