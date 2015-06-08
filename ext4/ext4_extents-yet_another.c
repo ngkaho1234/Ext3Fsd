@@ -729,7 +729,12 @@ static inline int ext4_ext_can_prepend(struct ext4_extent *ex1, struct ext4_exte
 	if (ext4_ext_get_actual_len(ex1) + ext4_ext_get_actual_len(ex2) > 4)
 		return 0;
 #else
-	if (ext4_ext_get_actual_len(ex1) + ext4_ext_get_actual_len(ex2) > EXT_INIT_MAX_LEN)
+	if (ext4_ext_is_unwritten(ex1))
+		if (ext4_ext_get_actual_len(ex1) + ext4_ext_get_actual_len(ex2)
+				> EXT_UNWRITTEN_MAX_LEN)
+			return 0;
+	else if (ext4_ext_get_actual_len(ex1) + ext4_ext_get_actual_len(ex2)
+				> EXT_INIT_MAX_LEN)
 		return 0;
 #endif
 
