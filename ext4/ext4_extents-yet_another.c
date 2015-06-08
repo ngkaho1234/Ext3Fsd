@@ -6,6 +6,18 @@
 #pragma warning(disable: 4242)
 #pragma warning(disable: 4244)
 
+/*
+ * used by extent splitting.
+ */
+#define EXT4_EXT_MAY_ZEROOUT	0x1  /* safe to zeroout if split fails \
+					due to ENOSPC */
+#define EXT4_EXT_MARK_UNWRIT1	0x2  /* mark first half unwritten */
+#define EXT4_EXT_MARK_UNWRIT2	0x4  /* mark second half unwritten */
+
+#define EXT4_EXT_DATA_VALID1	0x8  /* first half contains valid data */
+#define EXT4_EXT_DATA_VALID2	0x10 /* second half contains valid data */
+
+
 #define ext4_mark_inode_dirty(icb, n) ext3_mark_inode_dirty(icb, n)
 static inline ext4_fsblk_t ext4_inode_to_goal_block(struct inode *inode)
 {
@@ -1264,6 +1276,7 @@ int ext4_ext_split_extent_at(void *icb,
 	ex = (*ppath)[depth].p_ext;
 	ee_block = le32_to_cpu(ex->ee_block);
 	ee_len = ext4_ext_get_actual_len(ex);
+	newblock = split - ee_block + ext4_ext_pblock(ex);
 	
 	if (split == ee_block) {
 		/*
@@ -1316,7 +1329,7 @@ static int ext4_ext_convert_to_initialized (
 	int depth = ext_depth(inode), err;
 	struct ext4_extent *ex = (*ppath)[depth].p_ext;
 
-	assert (le32_to_cpu(ex->ee_block) <= split);
+	ASSERT (le32_to_cpu(ex->ee_block) <= split);
 
 	if (split + blocks == le32_to_cpu(ex->ee_block)
 				+ ext4_ext_get_actual_len(ex)) {
@@ -1418,7 +1431,7 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	 * this situations is possible, though, _during_ tree modification
 	 * this is why assert can't be put in ext4_ext_find_extent()
 	 */
-	BUG_ON(path[depth].p_ext == NULL && depth != 0);
+	ASSERT(!(path[depth].p_ext == NULL && depth != 0));
 
 	if ((ex = path[depth].p_ext)) {
 		ext4_lblk_t ee_block = le32_to_cpu(ex->ee_block);
@@ -1464,7 +1477,7 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	/* find next allocated block so that we know how many
 	 * blocks we can allocate without ovelapping next extent */
 	next = ext4_ext_next_allocated_block(path);
-	BUG_ON(next <= iblock);
+	ASSERT(next > iblock);
 	allocated = next - iblock;
 	if (flags & EXT4_GET_BLOCKS_PRE_IO &&
 		max_blocks > EXT_UNWRITTEN_MAX_LEN)
@@ -1492,7 +1505,7 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 	if (err) {
 		/* free data blocks we just allocated */
 		ext4_ext_free_blocks(icb, inode, ext4_ext_pblock(&newex),
-				le16_to_cpu(newex.ee_len), get_default_free_blocks_flags(inode));
+				le16_to_cpu(newex.ee_len), 0);
 		goto out2;
 	}
 	
