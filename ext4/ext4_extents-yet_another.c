@@ -849,7 +849,7 @@ static int ext4_ext_insert_leaf(void *icb,
 	}
 
 	ex->ee_block = newext->ee_block;
-	ex->ee_len = ext4_ext_get_actual_len(newext);
+	ex->ee_len = newext->ee_len;
 	ext4_ext_store_pblock(ex, ext4_ext_pblock(newext));
 	le16_add_cpu(&eh->eh_entries, 1);
 
