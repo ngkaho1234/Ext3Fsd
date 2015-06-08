@@ -782,24 +782,30 @@ static int ext4_ext_insert_leaf(void *icb,
 	struct ext4_extent *ex;
 	struct ext4_ext_path *curp = path + at;
 	struct buffer_head *bh = NULL;
-	int len, err;
+	int len, err, unwritten;
 	struct ext4_extent_header *eh;
 
 	if (curp->p_ext && le32_to_cpu(newext->ee_block) == le32_to_cpu(curp->p_ext->ee_block))
 		return -EIO;
 
 	if (curp->p_ext && ext4_ext_can_append(curp->p_ext, newext)) {
-		curp->p_ext->ee_len = ext4_ext_get_actual_len(curp->p_ext)
-			+ ext4_ext_get_actual_len(newext);
+		unwritten = ext4_ext_is_unwritten(curp->p_ext);
+		curp->p_ext->ee_len = cpu_to_le16(ext4_ext_get_actual_len(curp->p_ext)
+			+ ext4_ext_get_actual_len(newext));
+		if (unwritten)
+			ext4_ext_mark_unwritten(curp->p_ext);
 		err = __ext4_ext_dirty(icb, inode, curp);
 		goto out;
 
 	}
 
 	if (curp->p_ext && ext4_ext_can_prepend(curp->p_ext, newext)) {
+		unwritten = ext4_ext_is_unwritten(curp->p_ext);
 		curp->p_ext->ee_block = newext->ee_block;
-		curp->p_ext->ee_len = ext4_ext_get_actual_len(curp->p_ext)
-			+ ext4_ext_get_actual_len(newext);
+		curp->p_ext->ee_len = cpu_to_le16(ext4_ext_get_actual_len(curp->p_ext)
+			+ ext4_ext_get_actual_len(newext));
+		if (unwritten)
+			ext4_ext_mark_unwritten(curp->p_ext);
 		err = __ext4_ext_dirty(icb, inode, curp);
 		goto out;
 
@@ -1105,6 +1111,7 @@ static int ext4_ext_remove_leaf(void *icb,
 	while (ex <= EXT_LAST_EXTENT(path[depth].p_hdr)
 		&& le32_to_cpu(ex->ee_block) <= to) {
 		int new_len = 0;
+		int unwritten;
 		ext4_fsblk_t start, new_start;
 		new_start = start = le32_to_cpu(ex->ee_block);
 		len = ext4_ext_get_actual_len(ex);
@@ -1123,9 +1130,15 @@ static int ext4_ext_remove_leaf(void *icb,
 
 		ext4_ext_remove_blocks(icb, inode, ex, start, start + len - 1);
 		ex->ee_block = cpu_to_le32(new_start);
-		ex->ee_len = cpu_to_le16(new_len);
 		if (!new_len)
 			new_entries--;
+		else {
+			unwritten = ext4_ext_is_unwritten(ex);
+			ex->ee_len = cpu_to_le16(new_len);
+			if (unwritten)
+				ext4_ext_mark_unwritten(ex);
+
+		}
 
 		ex += 1;
 	}
