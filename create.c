@@ -453,7 +453,7 @@ Ext2LookupFile (
                         }
 
                         /* set inode attribute */
-                        if (!CanIWrite(Vcb) && Ext2IsOwnerReadOnly(Mcb->Inode.i_mode)) {
+                        if (!CanIWrite(Vcb) && !Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanWrite)) {
                             SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_READONLY);
                         }
 
@@ -961,7 +961,7 @@ Dissecting:
                     __leave;
                 }
 
-                if (!CanIWrite(Vcb) && Ext2IsOwnerReadOnly(ParentFcb->Mcb->Inode.i_mode)) {
+                if (!CanIWrite(Vcb) && !Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanWrite)) {
                     Status = STATUS_ACCESS_DENIED;
                     __leave;
                 }
@@ -1159,7 +1159,7 @@ Openit:
             }
 
             // Check readonly flag
-            if (!CanIWrite(Vcb) && Ext2IsOwnerReadOnly(Mcb->Inode.i_mode)) {
+            if (!CanIWrite(Vcb) && !Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanWrite)) {
                 if (BooleanFlagOn(DesiredAccess,  FILE_WRITE_DATA | FILE_APPEND_DATA |
                                   FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)) {
                     Status = STATUS_ACCESS_DENIED;
@@ -1868,8 +1868,8 @@ Ext2CreateInode(
     Inode.i_ino = iNo;
     Inode.i_ctime = Inode.i_mtime =
                         Inode.i_atime = Ext2LinuxTime(SysTime);
-    Inode.i_uid = (u16)Ext2Global->MountAsUid;
-    Inode.i_gid = (u16)Ext2Global->MountAsGid;
+    Inode.i_uid = (uid_t)Vcb->MountAsUid;
+    Inode.i_gid = (gid_t)Vcb->MountAsGid;
     Inode.i_generation = Parent->Inode->i_generation;
     Inode.i_mode = S_IPERMISSION_MASK &
                    Parent->Inode->i_mode;

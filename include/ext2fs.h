@@ -383,6 +383,16 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
     
 #define Ext2FileCanRead 0x1
 #define Ext2FileCanWrite 0x2
+#define Ext2FileCanExecute 0x4
+
+//
+// unix_perm.c:
+//
+int Ext2CheckPermissionInode(PEXT2_VCB *Vcb, struct inode *inode);
+int Ext2CheckPermission(PEXT2_VCB *Vcb, PEXT2_MCB Mcb);
+
+#define Ext2CheckPermissionAllowedInode(V, I, A) (Ext2CheckPermissionInode((V), (I)) & (A))
+#define Ext2CheckPermissionAllowed(V, M, A) (Ext2CheckPermission((V), (M)) & (A))
 
 /*
  * We need 8-bytes aligned for all the sturctures
@@ -682,6 +692,12 @@ typedef struct _EXT2_VCB {
 
     // Flags for the volume
     ULONG                       Flags;
+
+    // Mount as UID
+    ULONG                       MountAsUid;
+
+    // Mount as GID
+    ULONG                       MountAsGid;
 
     // Streaming File Object
     PFILE_OBJECT                Volume;

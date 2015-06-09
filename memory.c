@@ -2007,7 +2007,10 @@ Ext2ParseRegistryVolumeParams(
     BOOLEAN     bWriteSupport = FALSE,
                 bCheckBitmap = FALSE,
                 bCodeName = FALSE,
-                bMountPoint = FALSE;
+                bMountPoint = FALSE,
+                bMountAsUid = FALSE,
+                bMountAsGid = FALSE;
+
     struct {
         PWCHAR   Name;      /* parameters name */
         PBOOLEAN bExist;    /* is it contained in params */
@@ -2019,6 +2022,8 @@ Ext2ParseRegistryVolumeParams(
         {READING_ONLY, &Property->bReadonly, 0, NULL, NULL},
         {WRITING_SUPPORT, &bWriteSupport, 0, NULL, NULL},
         {EXT3_FORCEWRITING, &Property->bExt3Writable, 0, NULL, NULL},
+        {MOUNTAS_UID, &bMountAsUid, 0, NULL, NULL},
+        {MOUNTAS_GID, &bMountAsGid, 0, NULL, NULL},
 
         /* need check bitmap */
         {CHECKING_BITMAP, &bCheckBitmap, 0, NULL, NULL},
@@ -2143,6 +2148,9 @@ Ext2PerformRegistryVolumeParams(IN PEXT2_VCB Vcb)
         } else {
             SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
         }
+
+        Vcb->MountAsUid = Ext2Global->MountAsUid;
+        Vcb->MountAsGid = Ext2Global->MountAsGid;
 
         /* set the default codepage */
         Vcb->Codepage.PageTable = Ext2Global->Codepage.PageTable;
