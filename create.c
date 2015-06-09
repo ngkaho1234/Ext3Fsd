@@ -961,7 +961,7 @@ Dissecting:
                     __leave;
                 }
 
-                if (!CanIWrite(Vcb) && !Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanWrite)) {
+                if (!CanIWrite(Vcb) && !Ext2CheckPermissionAllowed(Vcb, Parent->Mcb, Ext2FileCanWrite)) {
                     Status = STATUS_ACCESS_DENIED;
                     __leave;
                 }
