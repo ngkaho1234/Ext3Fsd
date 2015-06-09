@@ -2816,8 +2816,8 @@ Ext2ShutDown (IN PEXT2_IRP_CONTEXT IrpContext);
 // unix_perm.c:
 //
 
-int Ext2CheckPermissionInode(PEXT2_VCB *Vcb, struct inode *inode);
-int Ext2CheckPermission(PEXT2_VCB *Vcb, PEXT2_MCB Mcb);
+int Ext2CheckPermissionInode(PEXT2_VCB Vcb, struct inode *inode);
+int Ext2CheckPermission(PEXT2_VCB Vcb, PEXT2_MCB Mcb);
 
 #define Ext2CheckPermissionAllowedInode(V, I, A) (Ext2CheckPermissionInode((V), (I)) & (A))
 #define Ext2CheckPermissionAllowed(V, M, A) (Ext2CheckPermission((V), (M)) & (A))

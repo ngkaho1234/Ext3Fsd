@@ -1,10 +1,10 @@
 #include "ext2fs.h"
 
-int Ext2CheckPermissionInode(PEXT2_VCB *Vcb, struct inode *inode)
+int Ext2CheckPermissionInode(PEXT2_VCB Vcb, struct inode *inode)
 {
     int Permission = 0;
     uid_t Uid = (uid_t)Vcb->MountAsUid;
-    git_t Gid = (gid_t)Vcb->MountAsGid;
+    gid_t Gid = (gid_t)Vcb->MountAsGid;
 
     if (!Uid || Uid == inode->i_uid) {
         /* Seems I am the owner of this file, or if my Uid is 0. */
@@ -25,7 +25,7 @@ int Ext2CheckPermissionInode(PEXT2_VCB *Vcb, struct inode *inode)
     return Permission;
 }
 
-int Ext2CheckPermission(PEXT2_VCB *Vcb, PEXT2_MCB Mcb)
+int Ext2CheckPermission(PEXT2_VCB Vcb, PEXT2_MCB Mcb)
 {
     return Ext2CheckPermissionInode(Vcb, &Mcb->Inode);
 }
