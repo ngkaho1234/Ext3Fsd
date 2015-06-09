@@ -385,14 +385,6 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 #define Ext2FileCanWrite 0x2
 #define Ext2FileCanExecute 0x4
 
-//
-// unix_perm.c:
-//
-int Ext2CheckPermissionInode(PEXT2_VCB *Vcb, struct inode *inode);
-int Ext2CheckPermission(PEXT2_VCB *Vcb, PEXT2_MCB Mcb);
-
-#define Ext2CheckPermissionAllowedInode(V, I, A) (Ext2CheckPermissionInode((V), (I)) & (A))
-#define Ext2CheckPermissionAllowed(V, M, A) (Ext2CheckPermission((V), (M)) & (A))
 
 /*
  * We need 8-bytes aligned for all the sturctures
@@ -2819,6 +2811,16 @@ Ext2RecoverJournal(
 
 NTSTATUS
 Ext2ShutDown (IN PEXT2_IRP_CONTEXT IrpContext);
+
+//
+// unix_perm.c:
+//
+
+int Ext2CheckPermissionInode(PEXT2_VCB *Vcb, struct inode *inode);
+int Ext2CheckPermission(PEXT2_VCB *Vcb, PEXT2_MCB Mcb);
+
+#define Ext2CheckPermissionAllowedInode(V, I, A) (Ext2CheckPermissionInode((V), (I)) & (A))
+#define Ext2CheckPermissionAllowed(V, M, A) (Ext2CheckPermission((V), (M)) & (A))
 
 
 //
