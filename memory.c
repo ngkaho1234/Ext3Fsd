@@ -2115,6 +2115,9 @@ Ext2PerformRegistryVolumeParams(IN PEXT2_VCB Vcb)
 {
     NTSTATUS        Status;
     UNICODE_STRING  VolumeParams;
+	
+    Vcb->MountAsUid = Ext2Global->MountAsUid;
+    Vcb->MountAsGid = Ext2Global->MountAsGid;
 
     Status = Ext2QueryVolumeParams(Vcb, &VolumeParams);
     if (NT_SUCCESS(Status)) {
@@ -2148,9 +2151,6 @@ Ext2PerformRegistryVolumeParams(IN PEXT2_VCB Vcb)
         } else {
             SetLongFlag(Vcb->Flags, VCB_READ_ONLY);
         }
-
-        Vcb->MountAsUid = Ext2Global->MountAsUid;
-        Vcb->MountAsGid = Ext2Global->MountAsGid;
 
         /* set the default codepage */
         Vcb->Codepage.PageTable = Ext2Global->Codepage.PageTable;
