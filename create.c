@@ -453,7 +453,7 @@ Ext2LookupFile (
                         }
 
                         /* set inode attribute */
-                        if (!CanIWrite(Vcb) && !Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanWrite)) {
+                        if (!Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanWrite)) {
                             SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_READONLY);
                         }
 
@@ -961,7 +961,7 @@ Dissecting:
                     __leave;
                 }
 
-                if (!CanIWrite(Vcb) && !Ext2CheckPermissionAllowed(Vcb, ParentFcb->Mcb, Ext2FileCanWrite)) {
+                if (!Ext2CheckPermissionAllowed(Vcb, ParentFcb->Mcb, Ext2FileCanWrite)) {
                     Status = STATUS_ACCESS_DENIED;
                     __leave;
                 }
@@ -1159,7 +1159,7 @@ Openit:
             }
 
             // Check readonly flag
-            if (!CanIWrite(Vcb) && !Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanWrite)) {
+            if (!Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanWrite)) {
                 if (BooleanFlagOn(DesiredAccess,  FILE_WRITE_DATA | FILE_APPEND_DATA |
                                   FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)) {
                     Status = STATUS_ACCESS_DENIED;

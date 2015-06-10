@@ -183,7 +183,7 @@ Ext2ProcessEntry(
             FileAttributes = FILE_ATTRIBUTE_NORMAL;
         }
 
-        if (!CanIWrite(Vcb) && !Ext2CheckPermissionAllowedInode(Vcb, &Inode, Ext2FileCanWrite)) {
+        if (!Ext2CheckPermissionAllowedInode(Vcb, &Inode, Ext2FileCanWrite)) {
             SetFlag(FileAttributes, FILE_ATTRIBUTE_READONLY);
         }
     }
