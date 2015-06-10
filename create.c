@@ -1159,6 +1159,11 @@ Openit:
             }
 
             // Check readonly flag
+			if (BooleanFlagOn(DesiredAccess,  FILE_GENERIC_READ) &&
+				!Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanRead)) {
+				Status = STATUS_ACCESS_DENIED;
+				__leave;
+			}
             if (!Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanWrite)) {
                 if (BooleanFlagOn(DesiredAccess,  FILE_WRITE_DATA | FILE_APPEND_DATA |
                                   FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)) {
