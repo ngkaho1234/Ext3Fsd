@@ -213,13 +213,17 @@ static int __ext4_ext_dirty(void *icb,
 	return err;
 }
 
-void ext4_ext_drop_refs(struct ext4_ext_path *path)
+void ext4_ext_drop_refs(struct ext4_ext_path *path, int keep_other)
 {
 	int depth, i;
 
 	if (!path)
 		return;
-	depth = path->p_depth;
+	if (keep_other)
+		depth = 0;
+	else
+		depth = path->p_depth;
+
 	for (i = 0; i <= depth; i++, path++)
 		if (path->p_bh) {
 			extents_brelse(path->p_bh);
@@ -391,7 +395,7 @@ int ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 	depth = ext_depth(inode);
 
 	if (path) {
-		ext4_ext_drop_refs(path);
+		ext4_ext_drop_refs(path, 0);
 		if (depth > path[0].p_maxdepth) {
 			kfree(path);
 			*orig_path = path = NULL;
@@ -449,7 +453,7 @@ int ext4_find_extent(struct inode *inode, ext4_lblk_t block,
 	return ret;
 
 err:
-	ext4_ext_drop_refs(path);
+	ext4_ext_drop_refs(path, 0);
 	kfree(path);
 	if (orig_path)
 		*orig_path = NULL;
@@ -1028,7 +1032,7 @@ again:
 out:
 	if (ret) {
 		if (*ppath)
-			ext4_ext_drop_refs(*ppath);
+			ext4_ext_drop_refs(*ppath, 0);
 
 		while (level >= 0 && newblocks) {
 			if (newblocks[level])
@@ -1215,7 +1219,7 @@ int __ext4_ext_remove_space(void *icb,
 				leaf_to = to;
 
 			ext4_ext_remove_leaf(icb, inode, path, leaf_from, leaf_to);
-			ext4_ext_drop_refs(path + i);
+			ext4_ext_drop_refs(path + i, 0);
 			i--;
 			continue;
 		} else {
@@ -1226,7 +1230,7 @@ int __ext4_ext_remove_space(void *icb,
 			if (ext4_ext_more_to_rm(path + i, to)) {
 				struct buffer_head *bh;
 				if (path[i+1].p_bh)
-					ext4_ext_drop_refs(path + i + 1);
+					ext4_ext_drop_refs(path + i + 1, 0);
 
 				bh = read_extent_tree_block(inode,
 					ext4_idx_pblock(path[i].p_idx),
@@ -1271,7 +1275,7 @@ int __ext4_ext_remove_space(void *icb,
 	}
 
 out:
-	ext4_ext_drop_refs(path);
+	ext4_ext_drop_refs(path, 0);
 	kfree(path);
 	path = NULL;
 	return ret;
@@ -1551,7 +1555,7 @@ out:
 	bh_result->b_blocknr = newblock;
 out2:
 	if (path) {
-		ext4_ext_drop_refs(path);
+		ext4_ext_drop_refs(path, 0);
 		kfree(path);
 	}
 	/*mutex_unlock(&ext4_I(inode)->truncate_mutex);*/
