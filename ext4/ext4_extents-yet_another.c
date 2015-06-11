@@ -1055,13 +1055,11 @@ out:
 		if (path)
 			ext4_ext_drop_refs(path, 0);
 
-		while (level >= 0 && spt) {
+		while (--level >= 0 && spt) {
 			if (spt[level].ptr) {
 				ext4_ext_free_blocks(icb, inode, spt[level].ptr, 1, 0);
 				extents_brelse(spt[level].bh);
 			}
-
-			level--;
 		}
 	} else {
 		while (--level >= 0 && spt) {
