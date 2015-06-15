@@ -196,14 +196,21 @@ typedef struct _EXT2_VOLUME_PROPERTY2 {
 
 } EXT2_VOLUME_PROPERTY2, *PEXT2_VOLUME_PROPERTY2;
 
-#define EXT2_VPROP3_AUTOMOUNT 0x0000000000000001
+#define EXT2_VPROP3_AUTOMOUNT       0x0000000000000001
+#define EXT2_VPROP3_MOUNTAS_UID_GID 0x0000000000000002
 
 typedef struct _EXT2_VOLUME_PROPERTY3 {
     EXT2_VOLUME_PROPERTY2  Prop2;
     unsigned __int64       Flags;
     int                    AutoMount:1;
     int                    Reserved1:31;
-    int                    Reserved2[31];
+    union {
+        int                Reserved2[31];
+        struct {
+            ULONG          MountAsUid;
+            ULONG          MountAsGid;
+        };
+    };
 } EXT2_VOLUME_PROPERTY3, *PEXT2_VOLUME_PROPERTY3;
 
 /* Ext2Fsd driver version and built time */

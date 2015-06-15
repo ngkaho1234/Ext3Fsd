@@ -334,6 +334,11 @@ Ext2ProcessGlobalProperty(
                 else
                     ClearLongFlag(Ext2Global->Flags, EXT2_AUTO_MOUNT);
             }
+
+            if (Prop3->Flags & EXT2_VPROP3_MOUNTAS_UID_GID) {
+                Ext2Global->MountAsUid = Prop3->MountAsUid;
+                Ext2Global->MountAsGid = Prop3->MountAsGid;
+            }
         }
 
     } __finally {
@@ -356,6 +361,7 @@ Ext2ProcessVolumeProperty(
 {
     NTSTATUS        Status = STATUS_SUCCESS;
     BOOLEAN         VcbResourceAcquired = FALSE;
+    PEXT2_VOLUME_PROPERTY3        Prop3;
     struct nls_table * PageTable = NULL;
 
     __try {
@@ -372,6 +378,12 @@ Ext2ProcessVolumeProperty(
         } else if (Property->Command == APP_CMD_SET_PROPERTY2 ||
                    Property->Command == APP_CMD_QUERY_PROPERTY2) {
             if (Length < sizeof(EXT2_VOLUME_PROPERTY2)) {
+                Status = STATUS_INVALID_PARAMETER;
+                __leave;
+            }
+        } else if (Property->Command == APP_CMD_SET_PROPERTY3 ||
+                   Property->Command == APP_CMD_QUERY_PROPERTY3) {
+            if (Length < sizeof(EXT2_VOLUME_PROPERTY3)) {
                 Status = STATUS_INVALID_PARAMETER;
                 __leave;
             }
@@ -439,6 +451,15 @@ Ext2ProcessVolumeProperty(
 
             break;
 
+        case APP_CMD_SET_PROPERTY3:
+
+            Prop3 = (PEXT2_VOLUME_PROPERTY3)Property;
+            if (Prop3->Flags & EXT2_VPROP3_MOUNTAS_UID_GID) {
+                Vcb->MountAsUid = Prop3->MountAsUid;
+                Vcb->MountAsGid = Prop3->MountAsGid;
+            }
+            break;
+
         case APP_CMD_QUERY_PROPERTY:
         case APP_CMD_QUERY_PROPERTY2:
 
@@ -483,6 +504,14 @@ Ext2ProcessVolumeProperty(
                 }
             }
 
+            break;
+
+        case APP_CMD_QUERY_PROPERTY3:
+
+            Prop3 = (PEXT2_VOLUME_PROPERTY3)Property;
+            Prop3->Flags = EXT2_VPROP3_MOUNTAS_UID_GID;
+            Prop3->MountAsUid = Vcb->MountAsUid;
+            Prop3->MountAsGid = Vcb->MountAsGid;
             break;
 
         default:

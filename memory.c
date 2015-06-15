@@ -1995,7 +1995,7 @@ errorout:
 VOID
 Ext2ParseRegistryVolumeParams(
     IN  PUNICODE_STRING         Params,
-    OUT PEXT2_VOLUME_PROPERTY2  Property
+    OUT PEXT2_VOLUME_PROPERTY3  Property
 )
 {
     WCHAR       Codepage[CODEPAGE_MAXLEN];
@@ -2014,32 +2014,38 @@ Ext2ParseRegistryVolumeParams(
     struct {
         PWCHAR   Name;      /* parameters name */
         PBOOLEAN bExist;    /* is it contained in params */
+        BOOLEAN  bIsDword;    /* is it a double word value */
         USHORT   Length;    /* parameter value length */
         PWCHAR   uValue;    /* value buffer in unicode */
         PCHAR    aValue;    /* value buffer in ansi */
+        PULONG   Value;     /* value buffer as ULONG */
     } ParamPattern[] = {
         /* writing support */
-        {READING_ONLY, &Property->bReadonly, 0, NULL, NULL},
-        {WRITING_SUPPORT, &bWriteSupport, 0, NULL, NULL},
-        {EXT3_FORCEWRITING, &Property->bExt3Writable, 0, NULL, NULL},
-        {MOUNTAS_UID, &bMountAsUid, 0, NULL, NULL},
-        {MOUNTAS_GID, &bMountAsGid, 0, NULL, NULL},
+        {READING_ONLY, &Property->Prop2.bReadonly, FALSE, 0, NULL, NULL, NULL},
+        {WRITING_SUPPORT, &bWriteSupport, FALSE, 0, NULL, NULL, NULL},
+        {EXT3_FORCEWRITING, &Property->Prop2.bExt3Writable, FALSE, 0, NULL, NULL, NULL},
 
         /* need check bitmap */
-        {CHECKING_BITMAP, &bCheckBitmap, 0, NULL, NULL},
+        {CHECKING_BITMAP, &bCheckBitmap, FALSE, 0, NULL, NULL, NULL},
         /* codepage */
-        {CODEPAGE_NAME, &bCodeName, CODEPAGE_MAXLEN,
-         &Codepage[0], Property->Codepage},
+        {CODEPAGE_NAME, &bCodeName, FALSE, CODEPAGE_MAXLEN,
+         &Codepage[0], Property->Prop2.Codepage, NULL},
         /* filter prefix and suffix */
-        {HIDING_PREFIX, &Property->bHidingPrefix, HIDINGPAT_LEN,
-         &Prefix[0], Property->sHidingPrefix},
-        {HIDING_SUFFIX, &Property->bHidingSuffix, HIDINGPAT_LEN,
-         &Suffix[0], Property->sHidingSuffix},
-        {MOUNT_POINT, &bMountPoint, 4,
-         &MountPoint[0], &DrvLetter[0]},
+        {HIDING_PREFIX, &Property->Prop2.bHidingPrefix, FALSE, HIDINGPAT_LEN,
+         &Prefix[0], Property->Prop2.sHidingPrefix, NULL},
+        {HIDING_SUFFIX, &Property->Prop2.bHidingSuffix, FALSE, HIDINGPAT_LEN,
+         &Suffix[0], Property->Prop2.sHidingSuffix, NULL},
+        {MOUNT_POINT, &bMountPoint, FALSE, 4,
+         &MountPoint[0], &DrvLetter[0], NULL},
+        /* mount as specific uid and gid */
+#define MOUNTAS_STRLEN_MAX  (20 * 2)
+        {MOUNTAS_UID, &bMountAsUid, TRUE, MOUNTAS_STRLEN_MAX,
+         NULL, NULL, &Property->MountAsUid},
+        {MOUNTAS_GID, &bMountAsGid, TRUE, MOUNTAS_STRLEN_MAX,
+         NULL, NULL, &Property->MountAsGid},
 
         /* end */
-        {NULL, NULL, 0, NULL}
+        {NULL, NULL, FALSE, 0, NULL}
     };
 
     USHORT i, j, k;
@@ -2050,9 +2056,9 @@ Ext2ParseRegistryVolumeParams(
     RtlZeroMemory(MountPoint, sizeof(USHORT) * 4);
     RtlZeroMemory(DrvLetter, sizeof(CHAR) * 4);
 
-    RtlZeroMemory(Property, sizeof(EXT2_VOLUME_PROPERTY2));
-    Property->Magic = EXT2_VOLUME_PROPERTY_MAGIC;
-    Property->Command = APP_CMD_SET_PROPERTY2;
+    RtlZeroMemory(Property, sizeof(EXT2_VOLUME_PROPERTY3));
+    Property->Prop2.Magic = EXT2_VOLUME_PROPERTY_MAGIC;
+    Property->Prop2.Command = APP_CMD_SET_PROPERTY2;
 
     for (i=0; ParamPattern[i].Name != NULL; i++) {
 
@@ -2075,27 +2081,46 @@ Ext2ParseRegistryVolumeParams(
                            (Name1.Buffer[Name2.Length/sizeof(WCHAR)] == L'=' )) {
                     j += Name2.Length/sizeof(WCHAR) + 1;
                     k = 0;
-                    while ( j + k < Params->Length/2 &&
-                            k < ParamPattern[i].Length &&
-                            Params->Buffer[j+k] != L';' &&
-                            Params->Buffer[j+k] != L',' ) {
-                        ParamPattern[i].uValue[k] = Params->Buffer[j + k++];
-                    }
-                    if (k) {
-                        NTSTATUS status;
-                        ANSI_STRING AnsiName;
-                        AnsiName.Length = 0;
-                        AnsiName.MaximumLength =ParamPattern[i].Length;
-                        AnsiName.Buffer = ParamPattern[i].aValue;
+                    if (!ParamPattern[i].bIsDword) {
+                        while ( j + k < Params->Length/2 &&
+                                k < ParamPattern[i].Length &&
+                                Params->Buffer[j+k] != L';' &&
+                                Params->Buffer[j+k] != L',' ) {
+                            ParamPattern[i].uValue[k] = Params->Buffer[j + k++];
+                        }
+                        if (k) {
+                            NTSTATUS status;
+                            ANSI_STRING AnsiName;
+                            AnsiName.Length = 0;
+                            AnsiName.MaximumLength =ParamPattern[i].Length;
+                            AnsiName.Buffer = ParamPattern[i].aValue;
 
-                        Name2.Buffer = ParamPattern[i].uValue;
-                        Name2.MaximumLength = Name2.Length = k * sizeof(WCHAR);
-                        status = RtlUnicodeStringToAnsiString(
-                                     &AnsiName, &Name2, FALSE);
-                        if (NT_SUCCESS(status)) {
-                            *(ParamPattern[i].bExist) = TRUE;
-                        } else {
-                            *ParamPattern[i].bExist = FALSE;
+                            Name2.Buffer = ParamPattern[i].uValue;
+                            Name2.MaximumLength = Name2.Length = k * sizeof(WCHAR);
+                            status = RtlUnicodeStringToAnsiString(
+                                         &AnsiName, &Name2, FALSE);
+                            if (NT_SUCCESS(status)) {
+                                *ParamPattern[i].bExist = TRUE;
+                            }
+                        }
+                    } else {
+                        while ( j + k < Params->Length/2 &&
+                                k < ParamPattern[i].Length &&
+                                Params->Buffer[j+k] != L';' &&
+                                Params->Buffer[j+k] != L',' ) {
+                            k++;
+                        }
+                        if (k) {
+                            NTSTATUS status;
+                            Name2.Buffer = Params->Buffer + j;
+                            Name2.MaximumLength = Name2.Length = k * sizeof(WCHAR);
+                            if (ParamPattern[i].Value) {
+                                status = RtlUnicodeStringToInteger(&Name2, 0,
+                                                ParamPattern[i].Value);
+                                if (NT_SUCCESS(status)) {
+                                    *ParamPattern[i].bExist = TRUE;
+                                }
+                            }
                         }
                     }
                 }
@@ -2105,8 +2130,8 @@ Ext2ParseRegistryVolumeParams(
     }
 
     if (bMountPoint) {
-        Property->DrvLetter = DrvLetter[0];
-        Property->DrvLetter |= 0x80;
+        Property->Prop2.DrvLetter = DrvLetter[0];
+        Property->Prop2.DrvLetter |= 0x80;
     }
 }
 
@@ -2123,8 +2148,11 @@ Ext2PerformRegistryVolumeParams(IN PEXT2_VCB Vcb)
     if (NT_SUCCESS(Status)) {
 
         /* set Vcb settings from registery */
-        EXT2_VOLUME_PROPERTY2  Property;
+        EXT2_VOLUME_PROPERTY3  Property;
         Ext2ParseRegistryVolumeParams(&VolumeParams, &Property);
+        Ext2ProcessVolumeProperty(Vcb, &Property, sizeof(Property));
+        Property.Prop2.Command = APP_CMD_SET_PROPERTY3;
+        Property->Flags = EXT2_VPROP3_MOUNTAS_UID_GID;
         Ext2ProcessVolumeProperty(Vcb, &Property, sizeof(Property));
 
     } else {
