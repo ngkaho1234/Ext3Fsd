@@ -599,11 +599,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             Mcb = Fcb->Mcb;
         }
 
-        if (Mcb->Parent && !Ext2CheckPermissionAllowed(Vcb, Mcb->Parent, Ext2FileCanWrite)) {
-            Status = STATUS_ACCESS_DENIED;
-            __leave;
-        }
-
         if ( !IsDirectory(Fcb) && !FlagOn(Fcb->Flags, FCB_PAGE_FILE) &&
                 ((FileInformationClass == FileEndOfFileInformation) ||
                  (FileInformationClass == FileValidDataLengthInformation) ||
@@ -653,6 +648,11 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 }
                 FcbPagingIoResourceAcquired = TRUE;
             }
+        }
+
+        if (Mcb->Parent && !Ext2CheckPermissionAllowed(Vcb, Mcb->Parent, Ext2FileCanWrite)) {
+            Status = STATUS_ACCESS_DENIED;
+            __leave;
         }
 
         switch (FileInformationClass) {
