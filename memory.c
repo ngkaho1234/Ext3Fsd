@@ -2150,10 +2150,10 @@ Ext2PerformRegistryVolumeParams(IN PEXT2_VCB Vcb)
         /* set Vcb settings from registery */
         EXT2_VOLUME_PROPERTY3  Property;
         Ext2ParseRegistryVolumeParams(&VolumeParams, &Property);
-        Ext2ProcessVolumeProperty(Vcb, &Property, sizeof(Property));
+        Ext2ProcessVolumeProperty(Vcb, (PEXT2_VOLUME_PROPERTY2)&Property, sizeof(Property));
         Property.Prop2.Command = APP_CMD_SET_PROPERTY3;
         Property->Flags = EXT2_VPROP3_MOUNTAS_UID_GID;
-        Ext2ProcessVolumeProperty(Vcb, &Property, sizeof(Property));
+        Ext2ProcessVolumeProperty(Vcb, (PEXT2_VOLUME_PROPERTY2)&Property, sizeof(Property));
 
     } else {
 
