@@ -105,6 +105,11 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
         if (!Mcb)
             Mcb = Fcb->Mcb;
 
+        if (Mcb->Parent && !Ext2CheckPermissionAllowed(Vcb, Mcb->Parent, Ext2FileCanRead)) {
+            Status = STATUS_ACCESS_DENIED;
+            __leave;
+        }
+
         Irp = IrpContext->Irp;
         IoStackLocation = IoGetCurrentIrpStackLocation(Irp);
         FileInformationClass =
@@ -592,6 +597,11 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             }
         } else {
             Mcb = Fcb->Mcb;
+        }
+
+        if (Mcb->Parent && !Ext2CheckPermissionAllowed(Vcb, Mcb->Parent, Ext2FileCanWrite)) {
+            Status = STATUS_ACCESS_DENIED;
+            __leave;
         }
 
         if ( !IsDirectory(Fcb) && !FlagOn(Fcb->Flags, FCB_PAGE_FILE) &&
@@ -1699,12 +1709,15 @@ Ext2DeleteFile(
         return STATUS_SUCCESS;
     }
 
+    if (Mcb->Parent && !Ext2CheckPermissionAllowed(Vcb, Mcb->Parent, Ext2FileCanWrite)) {
+        return STATUS_ACCESS_DENIED;
+    }
+
     if (!IsMcbSymLink(Mcb) && IsMcbDirectory(Mcb)) {
         if (!Ext2IsDirectoryEmpty(IrpContext, Vcb, Mcb)) {
             return STATUS_DIRECTORY_NOT_EMPTY;
         }
     }
-
 
     __try {
 
