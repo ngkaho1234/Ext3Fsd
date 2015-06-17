@@ -961,7 +961,7 @@ Dissecting:
                     __leave;
                 }
 
-                if (!Ext2CheckPermissionAllowed(Vcb, ParentFcb->Mcb, Ext2FileCanWrite)) {
+                if (!Ext2CheckPermissionAllowed(Vcb, ParentMcb, Ext2FileCanWrite)) {
                     Status = STATUS_ACCESS_DENIED;
                     __leave;
                 }
@@ -1039,6 +1039,7 @@ Dissecting:
 
                 Fcb = ParentFcb;
                 Mcb = Fcb->Mcb;
+                Ext2ReferXcb(&Fcb->ReferenceCount);
                 Ext2ReferMcb(Mcb);
 
                 Irp->IoStatus.Information = FILE_DOES_NOT_EXIST;
@@ -1159,11 +1160,11 @@ Openit:
             }
 
             // Check readonly flag
-			if (BooleanFlagOn(DesiredAccess,  FILE_GENERIC_READ) &&
-				!Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanRead)) {
-				Status = STATUS_ACCESS_DENIED;
-				__leave;
-			}
+            if (BooleanFlagOn(DesiredAccess,  FILE_GENERIC_READ) &&
+                !Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanRead)) {
+                Status = STATUS_ACCESS_DENIED;
+                __leave;
+            }
             if (!Ext2CheckPermissionAllowed(Vcb, Mcb, Ext2FileCanWrite)) {
                 if (BooleanFlagOn(DesiredAccess,  FILE_WRITE_DATA | FILE_APPEND_DATA |
                                   FILE_ADD_SUBDIRECTORY | FILE_DELETE_CHILD)) {
