@@ -649,19 +649,58 @@ Ext2WriteInode (
 {
     PEXT2_EXTENT    Chain = NULL;
     NTSTATUS        Status = STATUS_UNSUCCESSFUL;
+    PVOID           InlineBuffer = NULL;
 
     __try {
 
+        ASSERT(!(bDirectIo && S_ISLNK(Mcb->Inode.i_mode)));
+
         if (BytesWritten) {
             *BytesWritten = 0;
+        }
+
+        /* handle fast symlinks */
+        if (S_ISLNK(Mcb->Inode.i_mode) &&
+                Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
+
+            PUCHAR Data = (PUCHAR) (&Mcb->Inode.i_block[0]);
+
+            if (!Buffer) {
+                Status = STATUS_INSUFFICIENT_RESOURCES;
+                __leave;
+            }
+
+            if (Offset + Size < EXT2_LINKLEN_IN_INODE)
+                if (Offset + Size > Mcb->Inode.i_size)
+                    Mcb->Inode.i_size = Offset + Size;
+
+                RtlCopyMemory(Data + (ULONG)Offset, Buffer, Size);
+                Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
+                Status = STATUS_SUCCESS;
+                __leave;
+            } else {
+
+                /* The inline data should be migrated to blockmap/extents tree. */
+                InlineBuffer = Ext2AllocatePool(PagedPool, BLOCK_SIZE, EXT2_DATA_MAGIC);
+                if (!InlineBuffer) {
+                    Status = STATUS_INSUFFICIENT_RESOURCES;
+                    __leave;
+                }
+                RtlCopyMemory(InlineBuffer, Data, EXT2_LINKLEN_IN_INODE);
+                RtlCopyMemory(InlineBuffer + EXT2_LINKLEN_IN_INODE, Buffer,
+                    (Size < BLOCK_SIZE - EXT2_LINKLEN_IN_INODE)?
+                            Size:
+                        (BLOCK_SIZE - EXT2_LINKLEN_IN_INODE);
+
+            }
         }
 
         Status = Ext2BuildExtents (
                      IrpContext,
                      Vcb,
                      Mcb,
-                     Offset,
-                     Size,
+                     (InlineBuffer)?0:Offset,
+                     (InlineBuffer)?(Size + EXT2_LINKLEN_IN_INODE):Size,
                      IsMcbDirectory(Mcb) ? FALSE : TRUE,
                      &Chain
                  );
@@ -695,14 +734,30 @@ Ext2WriteInode (
             PEXT2_EXTENT Extent;
             for (Extent = Chain; Extent != NULL; Extent = Extent->Next) {
 
-                if ( !Ext2SaveBuffer(
-                            IrpContext,
-                            Vcb,
-                            Extent->Lba,
-                            Extent->Length,
-                            (PVOID)((PUCHAR)Buffer + Extent->Offset)
-                        )) {
-                    __leave;
+                if (InlineBuffer && Extent->Offset == 0) {
+
+                    if ( !Ext2SaveBuffer(
+                                IrpContext,
+                                Vcb,
+                                Extent->Lba,
+                                Extent->Length,
+                                (PVOID)((PUCHAR)InlineBuffer)
+                            )) {
+                        __leave;
+                    }
+
+                } else {
+
+                    if ( !Ext2SaveBuffer(
+                                IrpContext,
+                                Vcb,
+                                Extent->Lba,
+                                Extent->Length,
+                                (PVOID)((PUCHAR)Buffer + Extent->Offset)
+                            )) {
+                        __leave;
+                    }
+
                 }
             }
 
@@ -723,6 +778,15 @@ Ext2WriteInode (
 
         if (NT_SUCCESS(Status) && BytesWritten) {
             *BytesWritten = Size;
+        }
+
+        if (NT_SUCCESS(Status) && S_ISLNK(Mcb->Inode.i_mode)) {
+            Mcb->Inode.i_size += Size;
+            Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
+        }
+
+        if (InlineBuffer) {
+            Ext2FreePool(InlineBuffer, EXT2_DATA_MAGIC);
         }
     }
 
