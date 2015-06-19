@@ -18,7 +18,6 @@
 #define EXT4_EXT_DATA_VALID2	0x10 /* second half contains valid data */
 
 
-#define ext4_mark_inode_dirty(icb, n) ext3_mark_inode_dirty(icb, n)
 static inline ext4_fsblk_t ext4_inode_to_goal_block(struct inode *inode)
 {
 	PEXT2_VCB Vcb;

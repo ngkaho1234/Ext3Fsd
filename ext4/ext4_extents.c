@@ -36,7 +36,6 @@
 #define CONFIG_EXTENT_TEST
 #ifdef CONFIG_EXTENT_TEST
 
-#define ext4_mark_inode_dirty(icb, handle, n) ext3_mark_inode_dirty(icb, n)
 static inline ext4_fsblk_t ext4_inode_to_goal_block(struct inode *inode)
 {
 	PEXT2_VCB Vcb;

@@ -116,6 +116,14 @@ static inline struct ext4_sb_info * EXT4_SB(struct super_block *sb)
 }
 #define EXT4_I(i) (i)
 
+static inline int ext4_mark_inode_dirty(struct ext2_icb *icb, handle_t *handle, struct inode *in)
+{
+    if (Ext2SaveInode(icb, in->i_sb->s_priv, in))
+        return 0;
+
+    return -ENOMEM;
+}
+
 #include <linux/ext4_jbd2.h>
 #include <linux/ext4_ext.h>
 
