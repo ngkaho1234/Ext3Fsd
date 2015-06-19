@@ -20,6 +20,14 @@ extern PEXT2_GLOBAL Ext2Global;
 #ifdef ALLOC_PRAGMA
 #endif
 
+int ext4_mark_inode_dirty(struct ext2_icb *icb, handle_t *handle, struct inode *in)
+{
+    if (Ext2SaveInode(icb, in->i_sb->s_priv, in))
+        return 0;
+
+    return -ENOMEM;
+}
+
 
 NTSTATUS
 Ext2MapExtent(
