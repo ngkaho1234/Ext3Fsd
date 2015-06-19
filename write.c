@@ -671,7 +671,7 @@ Ext2WriteInode (
             }
 
             if (Offset + Size < EXT2_LINKLEN_IN_INODE)
-                if (Offset + Size > Mcb->Inode.i_size)
+                if (Offset + Size > Mcb->Inode.i_size) {
                     Mcb->Inode.i_size = Offset + Size;
 
                 RtlCopyMemory(Data + (ULONG)Offset, Buffer, Size);
