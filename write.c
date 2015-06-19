@@ -690,7 +690,7 @@ Ext2WriteInode (
                 RtlCopyMemory(InlineBuffer + Offset, Buffer,
                     (Size < BLOCK_SIZE - Offset)?
                             Size:
-                        (BLOCK_SIZE - Offset);
+                        (BLOCK_SIZE - Offset));
 
             }
         }
