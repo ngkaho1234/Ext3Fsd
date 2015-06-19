@@ -690,7 +690,7 @@ Ext2WriteInode (
                 RtlCopyMemory((PUCHAR)InlineBuffer + (ULONG)Offset, Buffer,
                     (Size < BLOCK_SIZE - Offset)?
                             Size:
-                        (BLOCK_SIZE - Offset));
+                        (BLOCK_SIZE - (ULONG)Offset));
 
             }
         }
@@ -754,7 +754,7 @@ Ext2WriteInode (
                                 Extent->Lba,
                                 Extent->Length,
                                 (PVOID)((PUCHAR)Buffer + Extent->Offset
-                                        - (InlineBuffer)?Offset:0)
+                                        - (InlineBuffer)?(ULONG)Offset:0)
                             )) {
                         __leave;
                     }
