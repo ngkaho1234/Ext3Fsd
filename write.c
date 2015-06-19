@@ -754,7 +754,7 @@ Ext2WriteInode (
                                 Extent->Lba,
                                 Extent->Length,
                                 (PVOID)((PUCHAR)Buffer + Extent->Offset
-                                        - (InlineBuffer)?(ULONG)Offset:0)
+                                        - (InlineBuffer)?Offset:0)
                             )) {
                         __leave;
                     }
