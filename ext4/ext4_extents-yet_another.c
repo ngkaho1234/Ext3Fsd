@@ -207,7 +207,7 @@ static int __ext4_ext_dirty(void *icb,
 		extents_mark_buffer_dirty(path->p_bh);
 	} else {
 		/* path points to leaf/index in inode body */
-		err = ext4_mark_inode_dirty(icb, inode);
+		err = ext4_mark_inode_dirty(icb, NULL, inode);
 	}
 	return err;
 }
@@ -985,7 +985,7 @@ static int ext4_ext_grow_indepth(void *icb,
 	le16_add_cpu(&neh->eh_depth, 1);
 
 	extents_mark_buffer_dirty(bh);
-	ext4_mark_inode_dirty(icb, inode);
+	ext4_mark_inode_dirty(icb, NULL, inode);
 	extents_brelse(bh);
 
 	return err;
@@ -1429,7 +1429,7 @@ int ext4_ext_tree_init(void *icb, handle_t *v, struct inode *inode)
 	eh->eh_entries = 0;
 	eh->eh_magic = cpu_to_le16(EXT4_EXT_MAGIC);
 	eh->eh_max = cpu_to_le16(ext4_ext_space_root(inode, 0));
-	ext4_mark_inode_dirty(icb, inode);
+	ext4_mark_inode_dirty(icb, v, inode);
 	return 0;
 }
 
@@ -1576,7 +1576,7 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 		goto out2;
 	}
 	
-	ext4_mark_inode_dirty(icb, inode);
+	ext4_mark_inode_dirty(icb, NULL, inode);
 
 	/* previous routine could use block we allocated */
 	if (ext4_ext_is_unwritten(&newex))
