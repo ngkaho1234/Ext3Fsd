@@ -636,7 +636,7 @@ Ext2WriteVolume (IN PEXT2_IRP_CONTEXT IrpContext)
 }
 
 NTSTATUS
-Ext2WriteInode (
+Ext2WriteSymlinkInode (
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
     IN PEXT2_MCB            Mcb,
@@ -788,6 +788,100 @@ Ext2WriteInode (
 
         if (InlineBuffer) {
             Ext2FreePool(InlineBuffer, EXT2_DATA_MAGIC);
+        }
+    }
+
+    return Status;
+}
+
+NTSTATUS
+Ext2WriteInode (
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_MCB            Mcb,
+    IN ULONGLONG            Offset,
+    IN PVOID                Buffer,
+    IN ULONG                Size,
+    IN BOOLEAN              bDirectIo,
+    OUT PULONG              BytesWritten
+)
+{
+    PEXT2_EXTENT    Chain = NULL;
+    NTSTATUS        Status = STATUS_UNSUCCESSFUL;
+
+    __try {
+
+        if (BytesWritten) {
+            *BytesWritten = 0;
+        }
+
+        Status = Ext2BuildExtents (
+                     IrpContext,
+                     Vcb,
+                     Mcb,
+                     Offset,
+                     Size,
+                     IsMcbDirectory(Mcb) ? FALSE : TRUE,
+                     &Chain
+                 );
+
+        if (!NT_SUCCESS(Status)) {
+            __leave;
+        }
+
+        if (Chain == NULL) {
+            Status = STATUS_SUCCESS;
+            __leave;
+        }
+
+        if (bDirectIo) {
+
+            ASSERT(IrpContext != NULL);
+
+            //
+            // We assume the offset is aligned.
+            //
+
+            Status = Ext2ReadWriteBlocks(
+                         IrpContext,
+                         Vcb,
+                         Chain,
+                         Size
+                     );
+
+        } else {
+
+            PEXT2_EXTENT Extent;
+            for (Extent = Chain; Extent != NULL; Extent = Extent->Next) {
+
+                if ( !Ext2SaveBuffer(
+                            IrpContext,
+                            Vcb,
+                            Extent->Lba,
+                            Extent->Length,
+                            (PVOID)((PUCHAR)Buffer + Extent->Offset)
+                        )) {
+                    __leave;
+                }
+            }
+
+            if (IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK)) {
+
+                DEBUG(DL_FLP, ("Ext2WriteInode is starting FlushingDpc...\n"));
+                Ext2StartFloppyFlushDpc(Vcb, NULL, NULL);
+            }
+
+            Status = STATUS_SUCCESS;
+        }
+
+    } __finally {
+
+        if (Chain) {
+            Ext2DestroyExtentChain(Chain);
+        }
+
+        if (NT_SUCCESS(Status) && BytesWritten) {
+            *BytesWritten = Size;
         }
     }
 
