@@ -88,8 +88,6 @@ Ext2MapExtent(
         DEBUG(DL_ERR, ("Block insufficient resources, err: %d\n", rc));
         return Ext2WinntError(rc);
     }
-    if (Alloc)
-        Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
     if (Number)
         *Number = rc ? rc : 1;
     if (Block)
@@ -139,8 +137,6 @@ Ext2DoExtentExpand(
     if (Block)
         *Block = (ULONG)bh_got.b_blocknr;
 
-    Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
-
     return STATUS_SUCCESS;
 }
 
@@ -186,9 +182,6 @@ Ext2ExpandExtent(
     }
 
     Size->QuadPart = ((LONGLONG)(Start + Count)) << BLOCK_BITS;
-
-    /* save inode whatever it succeeds to expand or not */
-    Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
 
     return Status;
 }
