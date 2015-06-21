@@ -1244,7 +1244,7 @@ Ext2TruncateSymlink(
         }
     }
     
-    if (Mcb->Inode.i_size > Size->QuadPart) {
+    if (Mcb->Inode.i_size > (loff_t)Size->QuadPart) {
         Mcb->Inode.i_size = Size->QuadPart;
         Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
     }
