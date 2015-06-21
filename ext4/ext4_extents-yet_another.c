@@ -1602,8 +1602,9 @@ out2:
 int ext4_ext_truncate(void *icb, struct inode *inode, unsigned long start)
 {
     int ret = __ext4_ext_remove_space(icb, inode, start, (ext4_lblk_t)-1);
+
+	/* Save modifications on i_blocks field of the inode. */
 	if (!ret)
-		/* Save modifications on i_blocks field of the inode. */
 		ret = ext4_mark_inode_dirty(icb, NULL, inode);
 
 	return ret;
