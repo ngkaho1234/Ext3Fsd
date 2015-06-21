@@ -43,7 +43,7 @@ Ext2MapExtent(
     EXT4_EXTENT_HEADER *eh;
     struct buffer_head bh_got;
     int    flags, rc;
-	ULONG max_blocks = 0;
+    ULONG max_blocks = 0;
 
     memset(&bh_got, 0, sizeof(struct buffer_head));
     eh = get_ext4_header(&Mcb->Inode);
@@ -70,10 +70,10 @@ Ext2MapExtent(
     if (IsMcbDirectory(Mcb) || IrpContext == NULL ||
         IrpContext->MajorFunction == IRP_MJ_WRITE || !Alloc){
         flags = EXT4_GET_BLOCKS_IO_CONVERT_EXT;
-		max_blocks = EXT_INIT_MAX_LEN;
+        max_blocks = EXT_INIT_MAX_LEN;
     } else {
         flags = EXT4_GET_BLOCKS_IO_CREATE_EXT;
-		max_blocks = EXT_UNWRITTEN_MAX_LEN;
+        max_blocks = EXT_UNWRITTEN_MAX_LEN;
     }
 
     if ((rc = ext4_ext_get_blocks(
@@ -210,7 +210,7 @@ Ext2TruncateExtent(
     /* calculate blocks to be freed */
     Extra = End - Wanted;
 
-	err = ext4_ext_remove_space(IrpContext, &Mcb->Inode, Wanted);
+    err = ext4_ext_remove_space(IrpContext, &Mcb->Inode, Wanted);
     if (err == 0) {
         if (!Ext2RemoveBlockExtent(Vcb, Mcb, Wanted, Extra)) {
             ClearFlag(Mcb->Flags, MCB_ZONE_INITED);
