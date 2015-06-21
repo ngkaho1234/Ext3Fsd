@@ -2089,6 +2089,14 @@ Ext2TruncateFile (
     PEXT2_VCB Vcb,
     PEXT2_MCB Mcb,
     PLARGE_INTEGER AllocationSize );
+    
+NTSTATUS
+Ext2TruncateSymlink(
+    PEXT2_IRP_CONTEXT IrpContext,
+    PEXT2_VCB         Vcb,
+    PEXT2_MCB         Mcb,
+    PLARGE_INTEGER    Size
+);
 
 NTSTATUS
 Ext2IsFileRemovable(
@@ -2863,6 +2871,17 @@ Ext2WriteInode (
     IN ULONG                Size,
     IN BOOLEAN              bDirectIo,
     OUT PULONG              dwReturn
+);
+
+NTSTATUS
+Ext2WriteSymlinkInode (
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_MCB            Mcb,
+    IN ULONGLONG            Offset,
+    IN PVOID                Buffer,
+    IN ULONG                Size,
+    OUT PULONG              BytesWritten
 );
 
 VOID
