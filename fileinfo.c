@@ -1228,6 +1228,32 @@ Ext2TruncateFile(
 }
 
 NTSTATUS
+Ext2TruncateSymlink(
+    PEXT2_IRP_CONTEXT IrpContext,
+    PEXT2_VCB         Vcb,
+    PEXT2_MCB         Mcb,
+    PLARGE_INTEGER    Size
+)
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    
+    if (Mcb->Inode.i_size >= EXT2_LINKLEN_IN_INODE) {
+        status = Ext2TruncateFile(IrpContext, Vcb, Mcb, Size);
+        if (!NT_SUCCESS(status)) {
+            goto out;
+        }
+    }
+    
+    if (Mcb->Inode.i_size > Size->QuadPart) {
+        Mcb->Inode.i_size = Size->QuadPart;
+        Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
+    }
+    
+out:
+    return status;
+}
+
+NTSTATUS
 Ext2IsFileRemovable(
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
