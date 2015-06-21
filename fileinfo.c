@@ -1228,7 +1228,7 @@ Ext2TruncateFile(
 }
 
 NTSTATUS
-Ext2TruncateSymlink(
+Ext2TruncateSymlinkInode(
     PEXT2_IRP_CONTEXT IrpContext,
     PEXT2_VCB         Vcb,
     PEXT2_MCB         Mcb,
