@@ -636,140 +636,68 @@ Ext2WriteVolume (IN PEXT2_IRP_CONTEXT IrpContext)
 }
 
 NTSTATUS
-Ext2WriteSymlinkInode (
+Ext2SymlinkBuildBmap(
     IN PEXT2_IRP_CONTEXT    IrpContext,
     IN PEXT2_VCB            Vcb,
-    IN PEXT2_MCB            Mcb,
-    IN ULONGLONG            Offset,
-    IN PVOID                Buffer,
-    IN ULONG                Size,
-    IN BOOLEAN              bDirectIo,
-    OUT PULONG              BytesWritten
+    IN PEXT2_MCB            Mcb
 )
 {
-    PEXT2_EXTENT    Chain = NULL;
+    PUCHAR          InlineBuffer = NULL;
+    PUCHAR          Data = (PUCHAR)(&Mcb->Inode.i_block[0]);
     NTSTATUS        Status = STATUS_UNSUCCESSFUL;
-    PVOID           InlineBuffer = NULL;
+    PEXT2_EXTENT    Chain = NULL;
+    PEXT2_EXTENT    Extent;
 
     __try {
 
-        ASSERT(!(bDirectIo && S_ISLNK(Mcb->Inode.i_mode)));
-
-        if (BytesWritten) {
-            *BytesWritten = 0;
+        /*
+         * The inline data should be migrated to blockmap/extents tree.
+         */
+        InlineBuffer = Ext2AllocatePool(PagedPool, BLOCK_SIZE, EXT2_DATA_MAGIC);
+        if (!InlineBuffer) {
+            Status = STATUS_INSUFFICIENT_RESOURCES;
+            __leave;
         }
+        RtlCopyMemory(InlineBuffer, Data, (ULONG)Mcb->Inode.i_size);
 
-        /* handle fast symlinks */
-        if (S_ISLNK(Mcb->Inode.i_mode) &&
-                Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
-
-            PUCHAR Data = (PUCHAR) (&Mcb->Inode.i_block[0]);
-
-            if (!Buffer) {
-                Status = STATUS_INSUFFICIENT_RESOURCES;
-                __leave;
-            }
-
-            if (Offset + Size < EXT2_LINKLEN_IN_INODE)
-                if (Offset + Size > Mcb->Inode.i_size) {
-                    Mcb->Inode.i_size = Offset + Size;
-
-                RtlCopyMemory(Data + (ULONG)Offset, Buffer, Size);
-                Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
-                Status = STATUS_SUCCESS;
-                __leave;
-            } else {
-
-                /* The inline data should be migrated to blockmap/extents tree. */
-                InlineBuffer = Ext2AllocatePool(PagedPool, BLOCK_SIZE, EXT2_DATA_MAGIC);
-                if (!InlineBuffer) {
-                    Status = STATUS_INSUFFICIENT_RESOURCES;
-                    __leave;
-                }
-                RtlCopyMemory(InlineBuffer, Data, EXT2_LINKLEN_IN_INODE);
-                RtlCopyMemory((PUCHAR)InlineBuffer + (ULONG)Offset, Buffer,
-                    (Size < BLOCK_SIZE - Offset)?
-                            Size:
-                        (BLOCK_SIZE - (ULONG)Offset));
-
-            }
-        }
-
-        Status = Ext2BuildExtents (
-                     IrpContext,
-                     Vcb,
-                     Mcb,
-                     (InlineBuffer)?0:Offset,
-                     (InlineBuffer)?(Size + (ULONG)Offset):Size,
-                     IsMcbDirectory(Mcb) ? FALSE : TRUE,
-                     &Chain
-                 );
+        /*
+         * Inode modifications may have been saved here.
+         */
+        Status = Ext2BuildExtents(
+                         IrpContext,
+                         Vcb,
+                         Mcb,
+                         0,
+                         (ULONG)Mcb->Inode.i_size,
+                         TRUE,
+                         &Chain
+                     );
 
         if (!NT_SUCCESS(Status)) {
             __leave;
         }
 
-        if (Chain == NULL) {
-            Status = STATUS_SUCCESS;
-            __leave;
+        for (Extent = Chain; Extent != NULL; Extent = Extent->Next) {
+
+            if ( !Ext2SaveBuffer(
+                        IrpContext,
+                        Vcb,
+                        Extent->Lba,
+                        Extent->Length,
+                        (PVOID)((PUCHAR)InlineBuffer + Extent->Offset)
+                    )) {
+                Status = STATUS_INSUFFICIENT_RESOURCES;
+                __leave;
+            }
         }
 
-        if (bDirectIo) {
+        if (IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK)) {
 
-            ASSERT(IrpContext != NULL);
-
-            //
-            // We assume the offset is aligned.
-            //
-
-            Status = Ext2ReadWriteBlocks(
-                         IrpContext,
-                         Vcb,
-                         Chain,
-                         Size
-                     );
-
-        } else {
-
-            PEXT2_EXTENT Extent;
-            for (Extent = Chain; Extent != NULL; Extent = Extent->Next) {
-
-                if (InlineBuffer && Extent->Offset == 0) {
-
-                    if ( !Ext2SaveBuffer(
-                                IrpContext,
-                                Vcb,
-                                Extent->Lba,
-                                Extent->Length,
-                                (PVOID)((PUCHAR)InlineBuffer)
-                            )) {
-                        __leave;
-                    }
-
-                } else {
-
-                    if ( !Ext2SaveBuffer(
-                                IrpContext,
-                                Vcb,
-                                Extent->Lba,
-                                Extent->Length,
-                                (PVOID)((PUCHAR)Buffer + Extent->Offset
-                                        - ((PUCHAR)InlineBuffer)?Offset:0)
-                            )) {
-                        __leave;
-                    }
-
-                }
-            }
-
-            if (IsFlagOn(Vcb->Flags, VCB_FLOPPY_DISK)) {
-
-                DEBUG(DL_FLP, ("Ext2WriteInode is starting FlushingDpc...\n"));
-                Ext2StartFloppyFlushDpc(Vcb, NULL, NULL);
-            }
-
-            Status = STATUS_SUCCESS;
+            DEBUG(DL_FLP, ("Ext2SymlinkBuildBmap is starting FlushingDpc...\n"));
+            Ext2StartFloppyFlushDpc(Vcb, NULL, NULL);
         }
+
+        Status = STATUS_SUCCESS;
 
     } __finally {
 
@@ -777,22 +705,15 @@ Ext2WriteSymlinkInode (
             Ext2DestroyExtentChain(Chain);
         }
 
-        if (NT_SUCCESS(Status) && BytesWritten) {
-            *BytesWritten = Size;
-        }
-
-        if (NT_SUCCESS(Status) && S_ISLNK(Mcb->Inode.i_mode)) {
-            Mcb->Inode.i_size += Size;
-            Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
-        }
-
         if (InlineBuffer) {
             Ext2FreePool(InlineBuffer, EXT2_DATA_MAGIC);
         }
+
     }
 
     return Status;
 }
+
 
 NTSTATUS
 Ext2WriteInode (
@@ -885,6 +806,56 @@ Ext2WriteInode (
         }
     }
 
+    return Status;
+}
+
+NTSTATUS
+Ext2WriteSymlinkInode (
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_MCB            Mcb,
+    IN ULONGLONG            Offset,
+    IN PVOID                Buffer,
+    IN ULONG                Size,
+    OUT PULONG              BytesWritten
+)
+{
+    NTSTATUS Status = STATUS_SUCCESS;
+    PUCHAR   Data = (PUCHAR)(&Mcb->Inode.i_block[0]);
+    BOOLEAN  bInodeModified = FALSE;
+
+    if (Offset + Size >= EXT2_LINKLEN_IN_INODE) {
+        if (Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
+            Status = Ext2SymlinkBuildBmap(IrpContext, Vcb, Mcb);
+            if (!NT_SUCCESS(Status)) {
+                goto out;
+            }
+        }
+        Status = Ext2WriteInode(IrpContext, Vcb, Mcb,
+                        Offset, Buffer, Size,
+                        FALSE, BytesWritten);
+        if (!NT_SUCCESS(Status)) {
+            goto out;
+        }
+    } else {
+        RtlCopyMemory(Data + (ULONG)Offset, Buffer, Size);
+        bInodeModified = TRUE;
+    }
+
+    if (Offset + Size > Mcb->Inode.i_size) {
+        Mcb->Inode.i_size = Offset + Size;
+        bInodeModified = TRUE;
+    }
+
+    if (bInodeModified) {
+        Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
+    }
+
+    if (BytesWritten) {
+        *BytesWritten = Size;
+    }
+
+out:
     return Status;
 }
 
