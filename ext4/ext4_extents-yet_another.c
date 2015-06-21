@@ -1575,7 +1575,8 @@ int ext4_ext_get_blocks(void *icb, handle_t *handle, struct inode *inode, ext4_f
 				le16_to_cpu(newex.ee_len), 0);
 		goto out2;
 	}
-	
+
+	/* Save modifications on i_blocks field of the inode. */
 	ext4_mark_inode_dirty(icb, NULL, inode);
 
 	/* previous routine could use block we allocated */

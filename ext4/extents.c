@@ -225,9 +225,10 @@ Ext2TruncateExtent(
         Size->QuadPart += ((ULONGLONG)Extra << BLOCK_BITS);
     }
 
-    /* save inode */
     if (Mcb->Inode.i_size > (loff_t)(Size->QuadPart))
         Mcb->Inode.i_size = (loff_t)(Size->QuadPart);
+
+    /* Save modifications on i_blocks field and i_size field of the inode. */
     Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
 
     return Status;
