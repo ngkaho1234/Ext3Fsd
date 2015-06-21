@@ -1321,11 +1321,6 @@ out:
 	return ret;
 }
 
-int ext4_ext_remove_space(void *icb, struct inode *inode, unsigned long start)
-{
-    return __ext4_ext_remove_space(icb, inode, start, (ext4_lblk_t)-1);
-}
-
 int ext4_ext_split_extent_at(void *icb,
 			     struct inode *inode,
 			     struct ext4_ext_path **ppath,
@@ -1602,6 +1597,15 @@ out2:
 	/*mutex_unlock(&ext4_I(inode)->truncate_mutex);*/
 
 	return err ? err : allocated;
+}
+
+int ext4_ext_truncate(void *icb, struct inode *inode, unsigned long start)
+{
+    int ret = __ext4_ext_remove_space(icb, inode, start, (ext4_lblk_t)-1);
+	if (!ret)
+		ret = ext4_mark_inode_dirty(icb, NULL, inode);
+
+	return ret;
 }
 
 #pragma warning(pop)

@@ -2498,5 +2498,14 @@ out2:
 	return err ? err : allocated;
 }
 
+int ext4_ext_truncate(void *icb, struct inode *inode, unsigned long start)
+{
+    int ret = ext4_ext_remove_space(icb, inode, start);
+	if (!ret)
+		ret = ext4_mark_inode_dirty(icb, NULL, inode);
+
+	return ret;
+}
+
 #pragma warning(pop)
 

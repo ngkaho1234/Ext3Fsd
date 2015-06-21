@@ -210,7 +210,7 @@ Ext2TruncateExtent(
     /* calculate blocks to be freed */
     Extra = End - Wanted;
 
-    err = ext4_ext_remove_space(IrpContext, &Mcb->Inode, Wanted);
+    err = ext4_ext_truncate(IrpContext, &Mcb->Inode, Wanted);
     if (err == 0) {
         if (!Ext2RemoveBlockExtent(Vcb, Mcb, Wanted, Extra)) {
             ClearFlag(Mcb->Flags, MCB_ZONE_INITED);
