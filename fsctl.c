@@ -1287,6 +1287,167 @@ Ext2GetRetrievalPointerBase (
     return Status;
 }
 
+NTSTATUS
+Ext2InspectReparseDataBuffer(
+    IN PREPARSE_DATA_BUFFER ReparseDataBuffer,
+    IN ULONG InputBufferLength
+)
+{
+    NTSTATUS Status = STATUS_SUCCESS;
+
+    if (InputBufferLength < sizeof(REPARSE_DATA_BUFFER)) {
+        Status = STATUS_BUFFER_OVERFLOW;
+        goto out;
+    }
+    if (ReparseDataBuffer->ReparseDataLength < InputBufferLength) {
+        Status = STATUS_BUFFER_OVERFLOW;
+        goto out;
+    }
+    if (ReparseDataBuffer->ReparseTag != IO_REPARSE_TAG_SYMLINK) {
+        Status = STATUS_NOT_IMPLEMENTED;
+        goto out;
+    }
+    if (((PUCHAR)(&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+        + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset)
+        + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameLength
+        - (PUCHAR)&ReparseDataBuffer)
+        < InputBufferLength) {
+        Status = STATUS_BUFFER_OVERFLOW;
+        goto out;
+    }
+    if (((PUCHAR)(&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+        + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameOffset)
+        + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameLength
+        - (PUCHAR)&ReparseDataBuffer)
+        < InputBufferLength) {
+        Status = STATUS_BUFFER_OVERFLOW;
+        goto out;
+    }
+    if (ReparseDataBuffer->SymbolicLinkReparseBuffer.Flags != SYMLINK_FLAG_RELATIVE) {
+        Status = STATUS_NOT_IMPLEMENTED;
+    }
+out:
+    return Status;
+}
+
+NTSTATUS
+Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
+{
+    return STATUS_UNSUCCESSFUL;
+}
+
+NTSTATUS
+Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
+{
+    PIRP                        Irp = NULL;
+    PIO_STACK_LOCATION          IrpSp;
+    PEXTENDED_IO_STACK_LOCATION EIrpSp;
+
+    PDEVICE_OBJECT      DeviceObject;
+//    PFILE_OBJECT        FileObject;
+
+    PEXT2_VCB           Vcb = NULL;
+    PEXT2_FCB           Fcb = NULL;
+    PEXT2_CCB           Ccb = NULL;
+    PEXT2_MCB           Mcb = NULL;
+
+    NTSTATUS            Status = STATUS_UNSUCCESSFUL;
+    BOOLEAN             MainResourceAcquired = FALSE;
+    
+    PVOID               InputBuffer;
+    ULONG               InputBufferLength;
+    ULONG               BytesWritten = 0;
+
+    PREPARSE_DATA_BUFFER ReparseDataBuffer;
+
+    UNICODE_STRING  UniName;
+    OEM_STRING      OemName;
+    
+    PCHAR           OemNameBuffer = NULL;
+    int             OemNameLength = 0, i;
+
+    Ccb = IrpContext->Ccb;
+    ASSERT(Ccb != NULL);
+    ASSERT((Ccb->Identifier.Type == EXT2CCB) &&
+           (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
+    DeviceObject = IrpContext->DeviceObject;
+    Vcb = (PEXT2_VCB) DeviceObject->DeviceExtension;
+    Fcb = IrpContext->Fcb;
+    Mcb = Fcb->Mcb;
+    Irp = IrpContext->Irp;
+    IrpSp = IoGetCurrentIrpStackLocation(Irp);
+    EIrpSp = (PEXTENDED_IO_STACK_LOCATION)IrpSp;
+    
+    __try {
+        if (!Mcb)
+            __leave;
+
+        if (!ExAcquireResourceSharedLite(
+                    &Fcb->MainResource,
+                    IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) )) {
+            Status = STATUS_PENDING;
+            __leave;
+        }
+        MainResourceAcquired = TRUE;
+        
+        InputBuffer  = EIrpSp->Parameters.FileSystemControl.Type3InputBuffer;
+        InputBufferLength = EIrpSp->Parameters.FileSystemControl.InputBufferLength;
+
+        ReparseDataBuffer = (PREPARSE_DATA_BUFFER)InputBuffer;
+        Status = Ext2InspectReparseDataBuffer(ReparseDataBuffer, InputBufferLength);
+        if (!NT_SUCCESS(Status)) {
+            __leave;
+        }
+
+        if (Mcb->Inode.i_size) {
+            Status = STATUS_INVALID_PARAMETER;
+            __leave;
+        }
+        
+        Mcb->Inode.i_mode |= S_IFLNK;
+        Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
+
+        UniName.Length = ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameLength;
+        UniName.MaximumLength = UniName.Length;
+        UniName.Buffer = (PWCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+                          + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset;
+
+        OemNameLength = OemName.Length = UniName.Length / sizeof(WCHAR);
+        OemName.MaximumLength = OemNameLength + 1;
+        OemNameBuffer = OemName.Buffer = Ext2AllocatePool(PagedPool,
+                                          OemName.MaximumLength,
+                                          'NL2E');
+        if (!OemNameBuffer) {
+            Status = STATUS_INSUFFICIENT_RESOURCES;
+            __leave;
+        }
+
+        OemName.Buffer[OemName.Length] = '\0';
+        for (i = 0;i < OemName.Length;i++) {
+            if (OemName.Buffer[i] == '\\') {
+                OemName.Buffer[i] = '/';
+            }
+        }
+        
+        Status = Ext2WriteSymlinkInode(IrpContext, Vcb, Mcb, 0, OemNameBuffer, OemNameLength, &BytesWritten);
+    } __finally {
+        if (MainResourceAcquired) {
+            ExReleaseResourceLite(&Fcb->MainResource);
+        }
+        
+        if (OemNameBuffer) {
+            Ext2FreePool(OemNameBuffer, 'NL2E');
+        }
+    }
+    
+    return Status;   
+}
+
+NTSTATUS
+Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
+{
+    return STATUS_UNSUCCESSFUL;
+}
 
 NTSTATUS
 Ext2UserFsRequest (IN PEXT2_IRP_CONTEXT IrpContext)
@@ -1314,6 +1475,18 @@ Ext2UserFsRequest (IN PEXT2_IRP_CONTEXT IrpContext)
 #endif
 
     switch (FsControlCode) {
+
+    case FSCTL_GET_REPARSE_POINT:
+        Status = Ext2GetSymlink(IrpContext);
+        break;
+        
+    case FSCTL_SET_REPARSE_POINT:
+        Status = Ext2SetSymlink(IrpContext);
+        break;
+        
+    case FSCTL_DELETE_REPARSE_POINT:
+        Status = Ext2DeleteSymlink(IrpContext);
+        break;
 
     case FSCTL_LOCK_VOLUME:
         Status = Ext2LockVolume(IrpContext);
