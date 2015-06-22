@@ -1333,6 +1333,7 @@ out:
 NTSTATUS
 Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
 {
+	Ext2CompleteIrpContext(IrpContext, STATUS_UNSUCCESSFUL);
     return STATUS_UNSUCCESSFUL;
 }
 
@@ -1438,6 +1439,14 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         if (OemNameBuffer) {
             Ext2FreePool(OemNameBuffer, 'NL2E');
         }
+		
+        if (!AbnormalTermination()) {
+            if (Status == STATUS_PENDING || Status == STATUS_CANT_WAIT) {
+                Status = Ext2QueueRequest(IrpContext);
+            } else {
+                Ext2CompleteIrpContext(IrpContext, Status);
+            }
+        }
     }
     
     return Status;   
@@ -1446,6 +1455,7 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
 NTSTATUS
 Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
 {
+	Ext2CompleteIrpContext(IrpContext, STATUS_UNSUCCESSFUL);
     return STATUS_UNSUCCESSFUL;
 }
 
