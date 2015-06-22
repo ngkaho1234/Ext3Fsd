@@ -1307,7 +1307,7 @@ Ext2InspectReparseDataBuffer(
         Status = STATUS_NOT_IMPLEMENTED;
         goto out;
     }
-    if (((PUCHAR)(&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+    if ((ULONG)((PUCHAR)(&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset)
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameLength
         - (PUCHAR)&ReparseDataBuffer)
@@ -1315,7 +1315,7 @@ Ext2InspectReparseDataBuffer(
         Status = STATUS_BUFFER_OVERFLOW;
         goto out;
     }
-    if (((PUCHAR)(&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+    if ((ULONG)((PUCHAR)(&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameOffset)
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameLength
         - (PUCHAR)&ReparseDataBuffer)
