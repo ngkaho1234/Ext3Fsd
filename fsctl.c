@@ -1413,7 +1413,12 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         UniName.Buffer = (PWCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
                           + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset;
 
-        OemNameLength = OemName.Length = Ext2UnicodeToOEMSize(Vcb, &UniName);
+        OemNameLength = Ext2UnicodeToOEMSize(Vcb, &UniName);
+		if (OemNameLength > USHRT_MAX) {
+			Status = STATUS_INVALID_PARAMETER;
+			__leave;
+		}
+		OemName.Length = (USHORT)OemNameLength;
         OemName.MaximumLength = OemNameLength + 1;
         OemNameBuffer = OemName.Buffer = Ext2AllocatePool(PagedPool,
                                           OemName.MaximumLength,
