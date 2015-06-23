@@ -841,6 +841,8 @@ Ext2WriteSymlinkInode (
     } else {
         ClearFlag(Mcb->Inode.i_flags, EXT4_EXTENTS_FL);
         RtlCopyMemory(Data + (ULONG)Offset, Buffer, Size);
+        Data[(ULONG)Offset + Size] = '\0';
+        Mcb->Inode.i_blocks = 0;
         bInodeModified = TRUE;
     }
 
