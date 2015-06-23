@@ -1391,7 +1391,7 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         }
         MainResourceAcquired = TRUE;
         
-        InputBuffer  = EIrpSp->Parameters.FileSystemControl.Type3InputBuffer;
+        InputBuffer  = Irp->AssociatedIrp.SystemBuffer;
         InputBufferLength = EIrpSp->Parameters.FileSystemControl.InputBufferLength;
 
         ReparseDataBuffer = (PREPARSE_DATA_BUFFER)InputBuffer;
@@ -1413,7 +1413,7 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         UniName.Buffer = (PWCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
                           + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset;
 
-        OemNameLength = OemName.Length = UniName.Length / sizeof(WCHAR);
+        OemNameLength = OemName.Length = Ext2UnicodeToOEMSize(Vcb, &UniName);
         OemName.MaximumLength = OemNameLength + 1;
         OemNameBuffer = OemName.Buffer = Ext2AllocatePool(PagedPool,
                                           OemName.MaximumLength,
@@ -1423,13 +1423,14 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
             __leave;
         }
 
+        Ext2UnicodeToOEM(Vcb, &OemName, &UniName);
         OemName.Buffer[OemName.Length] = '\0';
         for (i = 0;i < OemName.Length;i++) {
             if (OemName.Buffer[i] == '\\') {
                 OemName.Buffer[i] = '/';
             }
         }
-        
+
         Status = Ext2WriteSymlinkInode(IrpContext, Vcb, Mcb, 0, OemNameBuffer, OemNameLength, &BytesWritten);
     } __finally {
         if (MainResourceAcquired) {
