@@ -1307,18 +1307,18 @@ Ext2InspectReparseDataBuffer(
         Status = STATUS_NOT_IMPLEMENTED;
         goto out;
     }
-    if ((ULONG)((PUCHAR)(&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+    if ((ULONG)(((PUCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset)
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameLength
-        - (PUCHAR)&ReparseDataBuffer)
+        - &ReparseDataBuffer)
         < InputBufferLength) {
         Status = STATUS_BUFFER_OVERFLOW;
         goto out;
     }
-    if ((ULONG)((PUCHAR)(&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+    if ((ULONG)(((PUCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameOffset)
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameLength
-        - (PUCHAR)&ReparseDataBuffer)
+        - &ReparseDataBuffer)
         < InputBufferLength) {
         Status = STATUS_BUFFER_OVERFLOW;
         goto out;
@@ -1410,8 +1410,9 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
 
         UniName.Length = ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameLength;
         UniName.MaximumLength = UniName.Length;
-        UniName.Buffer = (PWCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
-                          + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset;
+        UniName.Buffer = 
+			(PWCHAR)((PUCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+             + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset);
 
         OemNameLength = Ext2UnicodeToOEMSize(Vcb, &UniName);
 		if (OemNameLength > USHRT_MAX) {
