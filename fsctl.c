@@ -1404,22 +1404,19 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
             Status = STATUS_INVALID_PARAMETER;
             __leave;
         }
-        
-        Mcb->Inode.i_mode |= S_IFLNK;
-        Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
 
         UniName.Length = ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameLength;
         UniName.MaximumLength = UniName.Length;
-        UniName.Buffer = 
-			(PWCHAR)((PUCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+        UniName.Buffer =
+            (PWCHAR)((PUCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
              + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset);
 
         OemNameLength = Ext2UnicodeToOEMSize(Vcb, &UniName);
-		if (OemNameLength > USHRT_MAX) {
-			Status = STATUS_INVALID_PARAMETER;
-			__leave;
-		}
-		OemName.Length = (USHORT)OemNameLength;
+        if (OemNameLength > USHRT_MAX) {
+            Status = STATUS_INVALID_PARAMETER;
+            __leave;
+        }
+        OemName.Length = (USHORT)OemNameLength;
         OemName.MaximumLength = OemNameLength + 1;
         OemNameBuffer = OemName.Buffer = Ext2AllocatePool(PagedPool,
                                           OemName.MaximumLength,
@@ -1437,6 +1434,12 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
             }
         }
 
+        SetFlag(Mcb->Inode.i_mode, S_IFLNK);
+        SetFlag(Mcb->Inode.i_mode, S_IRWXUGO);
+
+        ClearFlag(Mcb->Inode.i_flags, EXT4_EXTENTS_FL);
+        Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
+
         Status = Ext2WriteSymlinkInode(IrpContext, Vcb, Mcb, 0, OemNameBuffer, OemNameLength, &BytesWritten);
     } __finally {
         if (MainResourceAcquired) {
@@ -1446,7 +1449,7 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         if (OemNameBuffer) {
             Ext2FreePool(OemNameBuffer, 'NL2E');
         }
-		
+
         if (!AbnormalTermination()) {
             if (Status == STATUS_PENDING || Status == STATUS_CANT_WAIT) {
                 Status = Ext2QueueRequest(IrpContext);
@@ -1456,7 +1459,7 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         }
     }
     
-    return Status;   
+    return Status;
 }
 
 NTSTATUS

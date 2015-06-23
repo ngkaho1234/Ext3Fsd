@@ -660,6 +660,7 @@ Ext2SymlinkBuildBmap(
         }
         RtlCopyMemory(InlineBuffer, Data, (ULONG)Mcb->Inode.i_size);
 
+        SetFlag(Mcb->Inode.i_flags, EXT4_EXTENTS_FL);
         /*
          * Inode modifications may have been saved here.
          */
@@ -838,6 +839,7 @@ Ext2WriteSymlinkInode (
             goto out;
         }
     } else {
+        ClearFlag(Mcb->Inode.i_flags, EXT4_EXTENTS_FL);
         RtlCopyMemory(Data + (ULONG)Offset, Buffer, Size);
         bInodeModified = TRUE;
     }
