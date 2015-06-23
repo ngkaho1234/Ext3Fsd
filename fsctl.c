@@ -1299,7 +1299,7 @@ Ext2InspectReparseDataBuffer(
         Status = STATUS_BUFFER_OVERFLOW;
         goto out;
     }
-    if (ReparseDataBuffer->ReparseDataLength < InputBufferLength) {
+    if (InputBufferLength < ReparseDataBuffer->ReparseDataLength) {
         Status = STATUS_BUFFER_OVERFLOW;
         goto out;
     }
