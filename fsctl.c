@@ -1311,7 +1311,7 @@ Ext2InspectReparseDataBuffer(
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset)
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameLength
         - (PUCHAR)ReparseDataBuffer)
-        < InputBufferLength) {
+        > InputBufferLength) {
         Status = STATUS_BUFFER_OVERFLOW;
         goto out;
     }
@@ -1319,7 +1319,7 @@ Ext2InspectReparseDataBuffer(
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameOffset)
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameLength
         - (PUCHAR)ReparseDataBuffer)
-        < InputBufferLength) {
+        > InputBufferLength) {
         Status = STATUS_BUFFER_OVERFLOW;
         goto out;
     }
