@@ -1890,7 +1890,7 @@ Ext2CreateInode(
 
     /* Force using extent */
     if (IsFlagOn(SUPER_BLOCK->s_feature_incompat, EXT4_FEATURE_INCOMPAT_EXTENTS)) {
-        Inode.i_flags |= EXT2_EXTENTS_FL;
+        SetFlag(Inode.i_flags, EXT4_EXTENTS_FL);
     }
 
     /* add new entry to its parent */
