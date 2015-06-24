@@ -660,7 +660,6 @@ Ext2SymlinkBuildBmap(
         }
         RtlCopyMemory(InlineBuffer, Data, (ULONG)Mcb->Inode.i_size);
 
-        SetFlag(Mcb->Inode.i_flags, EXT4_EXTENTS_FL);
         /*
          * Inode modifications may have been saved here.
          */
@@ -824,9 +823,14 @@ Ext2WriteSymlinkInode (
     NTSTATUS Status = STATUS_SUCCESS;
     PUCHAR   Data = (PUCHAR)(&Mcb->Inode.i_block[0]);
     BOOLEAN  bInodeModified = FALSE;
-
+    
     if (Offset + Size >= EXT2_LINKLEN_IN_INODE) {
-        if (Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
+        if (IsFlagOn(SUPER_BLOCK->s_feature_incompat, EXT4_FEATURE_INCOMPAT_EXTENTS) &&
+            !IsFlagOn(Mcb->Inode.i_flags, EXT4_EXTENTS_FL)) {
+            SetFlag(Mcb->Inode.i_flags, EXT4_EXTENTS_FL);
+            bInodeModified = TRUE;
+        }
+        if (Mcb->Inode.i_size && Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
             Status = Ext2SymlinkBuildBmap(IrpContext, Vcb, Mcb);
             if (!NT_SUCCESS(Status)) {
                 goto out;
@@ -845,7 +849,7 @@ Ext2WriteSymlinkInode (
         Mcb->Inode.i_blocks = 0;
         bInodeModified = TRUE;
     }
-
+    
     if (Offset + Size > Mcb->Inode.i_size) {
         Mcb->Inode.i_size = Offset + Size;
         bInodeModified = TRUE;
