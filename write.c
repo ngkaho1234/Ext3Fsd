@@ -823,7 +823,7 @@ Ext2WriteSymlinkInode (
     NTSTATUS Status = STATUS_SUCCESS;
     PUCHAR   Data = (PUCHAR)(&Mcb->Inode.i_block[0]);
     BOOLEAN  bInodeModified = FALSE;
-    
+
     if (Offset + Size >= EXT2_LINKLEN_IN_INODE) {
         if (IsFlagOn(SUPER_BLOCK->s_feature_incompat, EXT4_FEATURE_INCOMPAT_EXTENTS) &&
             !IsFlagOn(Mcb->Inode.i_flags, EXT4_EXTENTS_FL)) {
@@ -836,6 +836,10 @@ Ext2WriteSymlinkInode (
                 goto out;
             }
         }
+        if (Offset + Size > Mcb->Inode.i_size) {
+            Mcb->Inode.i_size = Offset + Size;
+            bInodeModified = TRUE;
+        }
         Status = Ext2WriteInode(IrpContext, Vcb, Mcb,
                         Offset, Buffer, Size,
                         FALSE, BytesWritten);
@@ -844,14 +848,13 @@ Ext2WriteSymlinkInode (
         }
     } else {
         ClearFlag(Mcb->Inode.i_flags, EXT4_EXTENTS_FL);
+        if (Offset + Size > Mcb->Inode.i_size) {
+            Mcb->Inode.i_size = Offset + Size;
+            bInodeModified = TRUE;
+        }
         RtlCopyMemory(Data + (ULONG)Offset, Buffer, Size);
         Data[(ULONG)Offset + Size] = '\0';
         Mcb->Inode.i_blocks = 0;
-        bInodeModified = TRUE;
-    }
-    
-    if (Offset + Size > Mcb->Inode.i_size) {
-        Mcb->Inode.i_size = Offset + Size;
         bInodeModified = TRUE;
     }
 
