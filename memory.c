@@ -1106,27 +1106,15 @@ Ext2InitializeZone(
         Block = Mapped = 0;
 
         /* mapping file offset to ext2 block */
-        if (INODE_HAS_EXTENT(&Mcb->Inode)) {
-            Status = Ext2MapExtent(
-                         IrpContext,
-                         Vcb,
-                         Mcb,
-                         Start,
-                         FALSE,
-                         &Block,
-                         &Mapped
-                     );
-        } else {
-            Status = Ext2MapIndirect(
-                         IrpContext,
-                         Vcb,
-                         Mcb,
-                         Start,
-                         FALSE,
-                         &Block,
-                         &Mapped
-                     );
-        }
+        Status = Ext2BlockMap(
+                     IrpContext,
+                     Vcb,
+                     Mcb,
+                     Start,
+                     FALSE,
+                     &Block,
+                     &Mapped
+                 );
 
         if (!NT_SUCCESS(Status)) {
             goto errorout;

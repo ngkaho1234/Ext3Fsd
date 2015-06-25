@@ -245,15 +245,9 @@ struct buffer_head *ext3_bread(struct ext2_icb *icb, struct inode *inode,
     }
 
     /* mapping file offset to ext2 block */
-    if (INODE_HAS_EXTENT(&Mcb->Inode)) {
-        status = Ext2MapExtent(icb, inode->i_sb->s_priv,
-                               Mcb, block, FALSE,
-                               &lbn, &num);
-    } else {
-        status = Ext2MapIndirect(icb, inode->i_sb->s_priv,
-                                 Mcb, block, FALSE,
-                                 &lbn, &num);
-    }
+    status = Ext2BlockMap(icb, inode->i_sb->s_priv,
+                           Mcb, block, FALSE,
+                           &lbn, &num);
 
     if (!NT_SUCCESS(status)) {
         *err = Ext2LinuxError(status);
