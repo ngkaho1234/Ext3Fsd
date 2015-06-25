@@ -830,6 +830,7 @@ Ext2WriteSymlinkInode (
             SetFlag(Mcb->Inode.i_flags, EXT4_EXTENTS_FL);
             bInodeModified = TRUE;
         }
+        
         if (Mcb->Inode.i_size && Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
             Status = Ext2SymlinkBuildBmap(IrpContext, Vcb, Mcb);
             if (!NT_SUCCESS(Status)) {
@@ -837,6 +838,12 @@ Ext2WriteSymlinkInode (
             }
         }
         if (Offset + Size > Mcb->Inode.i_size) {
+            LARGE_INTEGER NewSize;
+            NewSize.QuadPart = Offset + Size;
+            Status = Ext2ExpandFile(IrpContext, Vcb, Mcb, &NewSize);
+            if (!NT_SUCCESS(Status)) {
+                goto out;
+            }
             Mcb->Inode.i_size = Offset + Size;
             bInodeModified = TRUE;
         }
