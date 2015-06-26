@@ -1249,6 +1249,7 @@ Ext2TruncateSymlinkInode(
     /* Since i_size has been modified already, there is no need to call Ext2SaveInode again. */
     if (OrigSize < EXT2_LINKLEN_IN_INODE && !Mcb->Inode.i_blocks) {
         RtlZeroMemory(Data + Size->LowPart, EXT2_LINKLEN_IN_INODE - Size->LowPart);
+        Mcb->Inode.i_size = Size->QuadPart;
         Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
     }
     
