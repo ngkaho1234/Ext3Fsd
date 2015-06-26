@@ -348,7 +348,8 @@ Ext2ReadInode (
 
         /* handle fast symlinks */
         if (S_ISLNK(Mcb->Inode.i_mode) &&
-                Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
+                Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE &&
+                !Mcb->Inode.i_blocks) {
 
             PUCHAR Data = (PUCHAR) (&Mcb->Inode.i_block[0]);
 

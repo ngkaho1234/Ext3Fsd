@@ -831,7 +831,8 @@ Ext2WriteSymlinkInode (
             bInodeModified = TRUE;
         }
         
-        if (Mcb->Inode.i_size && Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
+        if (Mcb->Inode.i_size && Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE &&
+            !Mcb->Inode.i_blocks) {
             Status = Ext2SymlinkBuildBmap(IrpContext, Vcb, Mcb);
             if (!NT_SUCCESS(Status)) {
                 goto out;

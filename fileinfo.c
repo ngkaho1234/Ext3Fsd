@@ -1236,6 +1236,8 @@ Ext2TruncateSymlinkInode(
 )
 {
     NTSTATUS status = STATUS_SUCCESS;
+    PUCHAR   Data = (PUCHAR)&Mcb->Inode.i_block;
+    ULONGLONG OrigSize = Mcb->Inode.i_size;
     
     if (Mcb->Inode.i_size >= EXT2_LINKLEN_IN_INODE) {
         status = Ext2TruncateFile(IrpContext, Vcb, Mcb, Size);
@@ -1244,8 +1246,9 @@ Ext2TruncateSymlinkInode(
         }
     }
     
-    if (Mcb->Inode.i_size > (loff_t)Size->QuadPart) {
-        Mcb->Inode.i_size = Size->QuadPart;
+    /* Since i_size has been modified already, there is no need to call Ext2SaveInode again. */
+    if (OrigSize < EXT2_LINKLEN_IN_INODE && !Mcb->Inode.i_blocks) {
+        RtlZeroMemory(Data + Size->LowPart, EXT2_LINKLEN_IN_INODE - Size->LowPart);
         Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
     }
     
@@ -1810,10 +1813,8 @@ Ext2DeleteFile(
             if (S_ISLNK(Mcb->Inode.i_mode)) {
 
                 /* for symlink, we should do differenctly  */
-                if (Mcb->Inode.i_size > EXT2_LINKLEN_IN_INODE) {
-                    Size.QuadPart = (LONGLONG)0;
-                    Status = Ext2TruncateFile(IrpContext, Vcb, Mcb, &Size);
-                }
+                Size.QuadPart = (LONGLONG)0;
+                Status = Ext2TruncateSymlinkInode(IrpContext, Vcb, Mcb, &Size);
 
             } else {
 
