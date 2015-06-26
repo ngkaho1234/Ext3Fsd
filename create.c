@@ -392,7 +392,7 @@ Ext2LookupFile (
                     Ext2DerefMcb(Parent);
                     Status = STATUS_SUCCESS;
                     Parent = Mcb;
-
+                    
                     if (IsMcbSymLink(Mcb) && IsFileDeleted(Mcb->Target) &&
                             (Mcb->Refercount == 1)) {
 
@@ -403,6 +403,15 @@ Ext2LookupFile (
                         ClearLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
                         SetLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
                         Mcb->FileAttr = FILE_ATTRIBUTE_NORMAL;
+                    } else {
+                        if (!IsMcbSymLink(Mcb) && S_ISLNK(Mcb->Inode.i_mode)) {
+                            Ext2FollowLink( IrpContext,
+                                            Vcb,
+                                            Parent,
+                                            Mcb,
+                                            Linkdep+1
+                                          );
+                        }
                     }
 
                 } else {
@@ -706,6 +715,7 @@ Ext2CreateFile(
     BOOLEAN             DeleteOnClose;
     BOOLEAN             TemporaryFile;
     BOOLEAN             CaseSensitive;
+    BOOLEAN             OpenReparsePoint;
 
     ACCESS_MASK         DesiredAccess;
     ULONG               ShareAccess;
@@ -725,6 +735,7 @@ Ext2CreateFile(
     NoIntermediateBuffering = IsFlagOn( Options, FILE_NO_INTERMEDIATE_BUFFERING );
     NoEaKnowledge = IsFlagOn(Options, FILE_NO_EA_KNOWLEDGE);
     DeleteOnClose = IsFlagOn(Options, FILE_DELETE_ON_CLOSE);
+    OpenReparsePoint = IsFlagOn(Options, FILE_OPEN_REPARSE_POINT);
 
     CaseSensitive = IsFlagOn(IrpSp->Flags, SL_CASE_SENSITIVE);
 
