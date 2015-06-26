@@ -1462,11 +1462,71 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
     return Status;
 }
 
+/* FIXME: We can only handle one reparse point right now. */
 NTSTATUS
 Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
 {
-	Ext2CompleteIrpContext(IrpContext, STATUS_UNSUCCESSFUL);
-    return STATUS_UNSUCCESSFUL;
+    PIRP                        Irp = NULL;
+
+    PDEVICE_OBJECT      DeviceObject;
+//    PFILE_OBJECT        FileObject;
+
+    PEXT2_VCB           Vcb = NULL;
+    PEXT2_FCB           Fcb = NULL;
+    PEXT2_CCB           Ccb = NULL;
+    PEXT2_MCB           Mcb = NULL;
+
+    NTSTATUS            Status = STATUS_UNSUCCESSFUL;
+    BOOLEAN             MainResourceAcquired = FALSE;
+    LARGE_INTEGER       NewSize;
+
+    Ccb = IrpContext->Ccb;
+    ASSERT(Ccb != NULL);
+    ASSERT((Ccb->Identifier.Type == EXT2CCB) &&
+           (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
+    DeviceObject = IrpContext->DeviceObject;
+    Vcb = (PEXT2_VCB) DeviceObject->DeviceExtension;
+    Fcb = IrpContext->Fcb;
+    Mcb = Fcb->Mcb;
+    Irp = IrpContext->Irp;
+    
+    __try {
+        if (!Mcb)
+            __leave;
+
+        if (!ExAcquireResourceSharedLite(
+                    &Fcb->MainResource,
+                    IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) )) {
+            Status = STATUS_PENDING;
+            __leave;
+        }
+        MainResourceAcquired = TRUE;
+
+        NewSize.QuadPart = 0;
+        Status = Ext2TruncateSymlinkInode(IrpContext, Vcb, Mcb, &NewSize);
+        if (!NT_SUCCESS(Status)) {
+            __leave;
+        }
+        if (IsFlagOn(SUPER_BLOCK->s_feature_incompat, EXT4_FEATURE_INCOMPAT_EXTENTS)) {
+            SetFlag(Mcb->Inode.i_flags, EXT4_EXTENTS_FL);
+        }
+        ClearFlag(Mcb->Inode.i_flags, S_IFLNK);
+        Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
+    } __finally {
+        if (MainResourceAcquired) {
+            ExReleaseResourceLite(&Fcb->MainResource);
+        }
+
+        if (!AbnormalTermination()) {
+            if (Status == STATUS_PENDING || Status == STATUS_CANT_WAIT) {
+                Status = Ext2QueueRequest(IrpContext);
+            } else {
+                Ext2CompleteIrpContext(IrpContext, Status);
+            }
+        }
+    }
+    
+    return Status;
 }
 
 NTSTATUS
