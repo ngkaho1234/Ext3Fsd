@@ -93,7 +93,7 @@ Ext2FollowLink (
         }
 
         /* read the symlink target path */
-        if (Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE) {
+        if (Mcb->Inode.i_size < EXT2_LINKLEN_IN_INODE && !Mcb->Inode.i_blocks) {
 
             OemName.Buffer = (PUCHAR) (&Mcb->Inode.i_block[0]);
             OemName.Length = (USHORT)Mcb->Inode.i_size;
