@@ -1423,7 +1423,7 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         }
         MainResourceAcquired = TRUE;
         
-        OutputBuffer  = Irp->AssociatedIrp.SystemBuffer;
+        OutputBuffer  = (PVOID)Ext2GetUserBuffer(Irp);
         OutputBufferLength = EIrpSp->Parameters.FileSystemControl.OutputBufferLength;
 
         ReparseDataBuffer = (PREPARSE_DATA_BUFFER)OutputBuffer;
@@ -1646,6 +1646,7 @@ Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
     PEXT2_MCB           Mcb = NULL;
 
     NTSTATUS            Status = STATUS_UNSUCCESSFUL;
+    BOOLEAN             bFcbAllocated = FALSE;
     BOOLEAN             MainResourceAcquired = FALSE;
     LARGE_INTEGER       NewSize;
 
@@ -1655,13 +1656,24 @@ Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
            (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
     DeviceObject = IrpContext->DeviceObject;
     Vcb = (PEXT2_VCB) DeviceObject->DeviceExtension;
-    Fcb = IrpContext->Fcb;
-    Mcb = Fcb->Mcb;
+    Mcb = Ccb->SymLink;
     Irp = IrpContext->Irp;
     
     __try {
-        if (!Mcb)
+        if (!Mcb) {
+            Status = STATUS_NOT_A_REPARSE_POINT;
             __leave;
+        }
+        Ext2ReferMcb(Mcb);
+        
+        Fcb = Ext2AllocateFcb (Vcb, Mcb);
+        if (Fcb) {
+            bFcbAllocated = TRUE;
+        } else {
+            Status = STATUS_INSUFFICIENT_RESOURCES;
+            __leave;
+        }
+        Ext2ReferXcb(&Fcb->ReferenceCount);
 
         if (!ExAcquireResourceSharedLite(
                     &Fcb->MainResource,
@@ -1692,6 +1704,16 @@ Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
             } else {
                 Ext2CompleteIrpContext(IrpContext, Status);
             }
+        }
+        
+        if (bFcbAllocated) {
+            if (Ext2DerefXcb(&Fcb->ReferenceCount) == 0) {
+                Ext2FreeFcb(Fcb);
+            }
+        }
+
+        if (Mcb) {
+            Ext2DerefMcb(Mcb);
         }
     }
     
