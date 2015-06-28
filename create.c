@@ -406,7 +406,7 @@ Ext2LookupFile (
                         SetLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
                         Mcb->FileAttr = FILE_ATTRIBUTE_NORMAL;
                     } else {
-                        if (!IsMcbSymLink(Mcb) && S_ISLNK(Mcb->Inode.i_mode)) {
+                        if (!IsMcbSymLink(Mcb) && S_ISLNK(Mcb->Inode.i_mode) && (Mcb->Refercount == 1)) {
                             Ext2FollowLink( IrpContext,
                                             Vcb,
                                             Parent,
