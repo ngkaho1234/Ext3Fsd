@@ -251,6 +251,8 @@ Ext2FastIoQueryBasicInfo (
     IN PDEVICE_OBJECT           DeviceObject)
 {
     PEXT2_FCB   Fcb = NULL;
+    PEXT2_CCB   Ccb = NULL;
+    PEXT2_MCB   Mcb = NULL;
     BOOLEAN     Status = FALSE;
     BOOLEAN     FcbMainResourceAcquired = FALSE;
 
@@ -270,7 +272,12 @@ Ext2FastIoQueryBasicInfo (
                 IoStatus->Status = STATUS_INVALID_PARAMETER;
                 __leave;
             }
-
+            Ccb = (PEXT2_CCB) FileObject->FsContext2;
+            if (Ccb && Ccb->SymLink) {
+                Mcb = Ccb->SymLink;
+            } else {
+                Mcb = Fcb->Mcb;
+            }
             ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                    (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 #if EXT2_DEBUG
@@ -304,15 +311,15 @@ Ext2FastIoQueryBasicInfo (
 
             if (IsRoot(Fcb)) {
                 Buffer->CreationTime = Buffer->LastAccessTime =
-                                           Buffer->LastWriteTime = Buffer->ChangeTime = Ext2NtTime(0);
+                                       Buffer->LastWriteTime = Buffer->ChangeTime = Ext2NtTime(0);
             } else {
-                Buffer->CreationTime = Fcb->Mcb->CreationTime;
-                Buffer->LastAccessTime = Fcb->Mcb->LastAccessTime;
-                Buffer->LastWriteTime = Fcb->Mcb->LastWriteTime;
-                Buffer->ChangeTime = Fcb->Mcb->ChangeTime;
+                Buffer->CreationTime = Mcb->CreationTime;
+                Buffer->LastAccessTime = Mcb->LastAccessTime;
+                Buffer->LastWriteTime = Mcb->LastWriteTime;
+                Buffer->ChangeTime = Mcb->ChangeTime;
             }
 
-            Buffer->FileAttributes = Fcb->Mcb->FileAttr;
+            Buffer->FileAttributes = Mcb->FileAttr;
             if (Buffer->FileAttributes == 0) {
                 Buffer->FileAttributes = FILE_ATTRIBUTE_NORMAL;
             }
@@ -888,10 +895,11 @@ Ext2FastIoQueryNetworkOpenInfo (
     IN PDEVICE_OBJECT       DeviceObject
 )
 {
-    BOOLEAN     bResult = FALSE;
-
     PEXT2_FCB   Fcb = NULL;
+    PEXT2_CCB   Ccb = NULL;
+    PEXT2_MCB   Mcb = NULL;
 
+    BOOLEAN     bResult = FALSE;
     BOOLEAN FcbResourceAcquired = FALSE;
 
     __try {
@@ -912,6 +920,11 @@ Ext2FastIoQueryNetworkOpenInfo (
 
         ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
+        Ccb = (PEXT2_CCB) FileObject->FsContext2;
+        if (Ccb && Ccb->SymLink)
+            Mcb = Ccb->SymLink;
+        else
+            Mcb = Fcb->Mcb;
 
 #if EXT2_DEBUG
         DEBUG(DL_INF, (
@@ -945,7 +958,7 @@ Ext2FastIoQueryNetworkOpenInfo (
             PFNOI->EndOfFile      = Fcb->Header.FileSize;
         }
 
-        PFNOI->FileAttributes = Fcb->Mcb->FileAttr;
+        PFNOI->FileAttributes = Mcb->FileAttr;
         if (PFNOI->FileAttributes == 0) {
             PFNOI->FileAttributes = FILE_ATTRIBUTE_NORMAL;
         }
@@ -956,10 +969,10 @@ Ext2FastIoQueryNetworkOpenInfo (
                     PFNOI->LastWriteTime =
                         PFNOI->ChangeTime = Ext2NtTime(0);
         } else {
-            PFNOI->CreationTime   = Fcb->Mcb->CreationTime;
-            PFNOI->LastAccessTime = Fcb->Mcb->LastAccessTime;
-            PFNOI->LastWriteTime  = Fcb->Mcb->LastWriteTime;
-            PFNOI->ChangeTime     = Fcb->Mcb->ChangeTime;
+            PFNOI->CreationTime   = Mcb->CreationTime;
+            PFNOI->LastAccessTime = Mcb->LastAccessTime;
+            PFNOI->LastWriteTime  = Mcb->LastWriteTime;
+            PFNOI->ChangeTime     = Mcb->ChangeTime;
         }
 
         bResult = TRUE;
