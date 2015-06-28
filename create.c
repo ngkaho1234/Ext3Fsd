@@ -202,7 +202,9 @@ Ext2FollowLink (
             SetLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
             ClearLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
             ASSERT(Mcb->Target->Refercount > 0);
-            Mcb->FileAttr = Target->FileAttr;
+            Mcb->FileAttr = FILE_ATTRIBUTE_REPARSE_POINT;
+            if (IsMcbDirectory(Target))
+                SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY);
         }
 
     } __finally {
