@@ -1295,6 +1295,10 @@ Ext2InspectReparseDataBuffer(
 {
     NTSTATUS Status = STATUS_SUCCESS;
 
+    if (!ReparseDataBuffer) {
+        Status = STATUS_INVALID_PARAMETER;
+        goto out;
+    }
     if (InputBufferLength < sizeof(REPARSE_DATA_BUFFER)) {
         Status = STATUS_BUFFER_OVERFLOW;
         goto out;
@@ -1332,15 +1336,20 @@ out:
 
 NTSTATUS
 Ext2InspectReparseDataBufferOutput(
+    IN PREPARSE_DATA_BUFFER ReparseDataBuffer,
     IN ULONG OutputBufferLength
 )
 {
     NTSTATUS Status = STATUS_SUCCESS;
 
+    if (!ReparseDataBuffer) {
+        Status = STATUS_INVALID_PARAMETER;
+        goto out;
+    }
     if (OutputBufferLength < sizeof(REPARSE_DATA_BUFFER)) {
         Status = STATUS_BUFFER_OVERFLOW;
     }
-
+out:
     return Status;
 }
 
@@ -1428,7 +1437,7 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         OutputBufferLength = EIrpSp->Parameters.FileSystemControl.OutputBufferLength;
 
         ReparseDataBuffer = (PREPARSE_DATA_BUFFER)OutputBuffer;
-        Status = Ext2InspectReparseDataBufferOutput(OutputBufferLength);
+        Status = Ext2InspectReparseDataBufferOutput(ReparseDataBuffer, OutputBufferLength);
         if (!NT_SUCCESS(Status)) {
             __leave;
         }
