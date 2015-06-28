@@ -1357,8 +1357,9 @@ VOID
 Ext2InitializeReparseBuffer(IN PREPARSE_DATA_BUFFER ReparseDataBuffer, USHORT PathBufferLength)
 {
     ReparseDataBuffer->ReparseTag = IO_REPARSE_TAG_SYMLINK;
-    ReparseDataBuffer->ReparseDataLength = PathBufferLength +
-                         sizeof(ReparseDataBuffer->SymbolicLinkReparseBuffer) - sizeof(WCHAR);
+    ReparseDataBuffer->ReparseDataLength = FIELD_OFFSET(REPARSE_DATA_BUFFER, SymbolicLinkReparseBuffer.PathBuffer) -
+                                           FIELD_OFFSET(REPARSE_DATA_BUFFER, GenericReparseBuffer.DataBuffer) +
+                                           PathBufferLength;
     ReparseDataBuffer->Reserved = 0;
     ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset = 0;
     ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameLength = PathBufferLength;
@@ -1406,7 +1407,6 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
     Mcb = Ccb->SymLink;
     Irp = IrpContext->Irp;
     IrpSp = IoGetCurrentIrpStackLocation(Irp);
-    EIrpSp = (PEXTENDED_IO_STACK_LOCATION)IrpSp;
     
     __try {
         if (!Mcb || !IsMcbSymLink(Mcb)) {
@@ -1414,8 +1414,8 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
             __leave;
         }
         
-        OutputBuffer  = (PVOID)Ext2GetUserBuffer(Irp);
-        OutputBufferLength = EIrpSp->Parameters.FileSystemControl.OutputBufferLength;
+        OutputBuffer  = (PVOID)Irp->AssociatedIrp.SystemBuffer;
+        OutputBufferLength = IrpSp->Parameters.FileSystemControl.OutputBufferLength;
 
         ReparseDataBuffer = (PREPARSE_DATA_BUFFER)OutputBuffer;
         Status = Ext2InspectReparseDataBufferOutput(ReparseDataBuffer, OutputBufferLength);
@@ -1459,15 +1459,18 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
             UniName.Length = (USHORT)OutputBufferLength - FIELD_OFFSET(REPARSE_DATA_BUFFER, SymbolicLinkReparseBuffer.PathBuffer);
         }
         UniName.MaximumLength = UniName.Length;
+        UniName.Length = (USHORT)Ext2OEMToUnicodeSize(Vcb, &OemName);
         Irp->IoStatus.Information = FIELD_OFFSET(REPARSE_DATA_BUFFER, SymbolicLinkReparseBuffer.PathBuffer) + UniName.Length;
-        if (UniName.MaximumLength < (UniName.Length = (USHORT)Ext2OEMToUnicodeSize(Vcb, &OemName))) {
+        if (UniName.MaximumLength < UniName.Length) {
             Status = STATUS_BUFFER_TOO_SMALL;
             __leave;
         }
         Ext2InitializeReparseBuffer(ReparseDataBuffer, UniName.Length);
-        UniName.Buffer =
-            (PWCHAR)((PUCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+        UniName.Buffer = ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer;
+        /*
+            (PWCHAR)((PUCHAR)&
              + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset);
+         */
         Ext2OEMToUnicode(Vcb, &UniName, &OemName);
         
         Status = STATUS_SUCCESS;
@@ -1495,7 +1498,6 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
 {
     PIRP                        Irp = NULL;
     PIO_STACK_LOCATION          IrpSp;
-    PEXTENDED_IO_STACK_LOCATION EIrpSp;
 
     PDEVICE_OBJECT      DeviceObject;
 //    PFILE_OBJECT        FileObject;
@@ -1530,7 +1532,6 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
     Mcb = Fcb->Mcb;
     Irp = IrpContext->Irp;
     IrpSp = IoGetCurrentIrpStackLocation(Irp);
-    EIrpSp = (PEXTENDED_IO_STACK_LOCATION)IrpSp;
     
     __try {
         if (!Mcb)
@@ -1545,7 +1546,7 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         MainResourceAcquired = TRUE;
         
         InputBuffer  = Irp->AssociatedIrp.SystemBuffer;
-        InputBufferLength = EIrpSp->Parameters.FileSystemControl.InputBufferLength;
+        InputBufferLength = IrpSp->Parameters.FileSystemControl.InputBufferLength;
 
         ReparseDataBuffer = (PREPARSE_DATA_BUFFER)InputBuffer;
         Status = Ext2InspectReparseDataBuffer(ReparseDataBuffer, InputBufferLength);
