@@ -1379,12 +1379,10 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
 //    PFILE_OBJECT        FileObject;
 
     PEXT2_VCB           Vcb = NULL;
-    PEXT2_FCB           Fcb = NULL;
     PEXT2_CCB           Ccb = NULL;
     PEXT2_MCB           Mcb = NULL;
 
     NTSTATUS            Status = STATUS_UNSUCCESSFUL;
-    BOOLEAN             bFcbAllocated = FALSE;
     BOOLEAN             MainResourceAcquired = FALSE;
 
     PVOID               OutputBuffer;
@@ -1411,27 +1409,10 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
     EIrpSp = (PEXTENDED_IO_STACK_LOCATION)IrpSp;
     
     __try {
-        if (!Mcb) {
+        if (!Mcb || !IsMcbSymLink(Mcb)) {
             Status = STATUS_NOT_A_REPARSE_POINT;
             __leave;
         }
-        
-        Fcb = Ext2AllocateFcb (Vcb, Mcb);
-        if (Fcb) {
-            bFcbAllocated = TRUE;
-        } else {
-            Status = STATUS_INSUFFICIENT_RESOURCES;
-            __leave;
-        }
-        Ext2ReferXcb(&Fcb->ReferenceCount);
-
-        if (!ExAcquireResourceSharedLite(
-                    &Fcb->MainResource,
-                    IsFlagOn(IrpContext->Flags, IRP_CONTEXT_FLAG_WAIT) )) {
-            Status = STATUS_PENDING;
-            __leave;
-        }
-        MainResourceAcquired = TRUE;
         
         OutputBuffer  = (PVOID)Ext2GetUserBuffer(Irp);
         OutputBufferLength = EIrpSp->Parameters.FileSystemControl.OutputBufferLength;
@@ -1467,17 +1448,18 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
                                  &BytesRead);
         OemName.Buffer[OemName.Length] = '\0';
         for (i = 0;i < OemName.Length;i++) {
-            if (OemName.Buffer[i] == '\\') {
-                OemName.Buffer[i] = '/';
+            if (OemName.Buffer[i] == '/') {
+                OemName.Buffer[i] = '\\';
             }
         }
 
-        if (OutputBufferLength - sizeof(REPARSE_DATA_BUFFER) > USHRT_MAX) {
+        if (OutputBufferLength - FIELD_OFFSET(REPARSE_DATA_BUFFER, SymbolicLinkReparseBuffer.PathBuffer) > USHRT_MAX) {
             UniName.Length = USHRT_MAX;
         } else {
-            UniName.Length = (USHORT)OutputBufferLength - sizeof(REPARSE_DATA_BUFFER);
+            UniName.Length = (USHORT)OutputBufferLength - FIELD_OFFSET(REPARSE_DATA_BUFFER, SymbolicLinkReparseBuffer.PathBuffer);
         }
         UniName.MaximumLength = UniName.Length;
+        Irp->IoStatus.Information = FIELD_OFFSET(REPARSE_DATA_BUFFER, SymbolicLinkReparseBuffer.PathBuffer) + UniName.Length;
         if (UniName.MaximumLength < (UniName.Length = (USHORT)Ext2OEMToUnicodeSize(Vcb, &OemName))) {
             Status = STATUS_BUFFER_TOO_SMALL;
             __leave;
@@ -1489,10 +1471,8 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         Ext2OEMToUnicode(Vcb, &UniName, &OemName);
         
         Status = STATUS_SUCCESS;
+
     } __finally {
-        if (MainResourceAcquired) {
-            ExReleaseResourceLite(&Fcb->MainResource);
-        }
         
         if (OemNameBuffer) {
             Ext2FreePool(OemNameBuffer, 'NL2E');
@@ -1503,12 +1483,6 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
                 Status = Ext2QueueRequest(IrpContext);
             } else {
                 Ext2CompleteIrpContext(IrpContext, Status);
-            }
-        }
-        
-        if (bFcbAllocated) {
-            if (Ext2DerefXcb(&Fcb->ReferenceCount) == 0) {
-                Ext2FreeFcb(Fcb);
             }
         }
     }
