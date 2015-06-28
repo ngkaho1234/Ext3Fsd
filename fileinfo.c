@@ -451,7 +451,11 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             if (FATI->FileAttributes == 0) {
                 FATI->FileAttributes = FILE_ATTRIBUTE_NORMAL;
             }
-            FATI->ReparseTag = IO_REPARSE_TAG_RESERVED_ZERO;
+            if (IsMcbSymLink(Mcb)) {
+                FATI->ReparseTag = IO_REPARSE_TAG_SYMLINK;
+            } else {
+                FATI->ReparseTag = IO_REPARSE_TAG_RESERVED_ZERO;
+            }
             Irp->IoStatus.Information = sizeof(FILE_ATTRIBUTE_TAG_INFORMATION);
             Status = STATUS_SUCCESS;
         }
