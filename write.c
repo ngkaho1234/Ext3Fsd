@@ -824,7 +824,7 @@ Ext2WriteSymlinkInode (
     PUCHAR   Data = (PUCHAR)(&Mcb->Inode.i_block[0]);
     BOOLEAN  bInodeModified = FALSE;
 
-    if (Offset + Size >= EXT2_LINKLEN_IN_INODE) {
+    if (Offset + Size >= EXT2_LINKLEN_IN_INODE || Mcb->Inode.i_blocks) {
         if (IsFlagOn(SUPER_BLOCK->s_feature_incompat, EXT4_FEATURE_INCOMPAT_EXTENTS) &&
             !IsFlagOn(Mcb->Inode.i_flags, EXT4_EXTENTS_FL)) {
             SetFlag(Mcb->Inode.i_flags, EXT4_EXTENTS_FL);
