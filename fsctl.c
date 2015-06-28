@@ -1307,7 +1307,7 @@ Ext2InspectReparseDataBuffer(
         Status = STATUS_NOT_IMPLEMENTED;
         goto out;
     }
-    if ((ULONG)(((PUCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+    if ((ULONG)(((PUCHAR)ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset)
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameLength
         - (PUCHAR)ReparseDataBuffer)
@@ -1315,7 +1315,7 @@ Ext2InspectReparseDataBuffer(
         Status = STATUS_BUFFER_OVERFLOW;
         goto out;
     }
-    if ((ULONG)(((PUCHAR)&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
+    if ((ULONG)(((PUCHAR)ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameOffset)
         + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameLength
         - (PUCHAR)ReparseDataBuffer)
@@ -1348,7 +1348,8 @@ VOID
 Ext2InitializeReparseBuffer(IN PREPARSE_DATA_BUFFER ReparseDataBuffer, USHORT PathBufferLength)
 {
     ReparseDataBuffer->ReparseTag = IO_REPARSE_TAG_SYMLINK;
-    ReparseDataBuffer->ReparseDataLength = PathBufferLength;
+    ReparseDataBuffer->ReparseDataLength = PathBufferLength +
+                         sizeof(ReparseDataBuffer->SymbolicLinkReparseBuffer) - sizeof(WCHAR);
     ReparseDataBuffer->Reserved = 0;
     ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset = 0;
     ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameLength = PathBufferLength;
