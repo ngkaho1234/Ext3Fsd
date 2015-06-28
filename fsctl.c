@@ -1665,7 +1665,6 @@ Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
             Status = STATUS_NOT_A_REPARSE_POINT;
             __leave;
         }
-        Ext2ReferMcb(Mcb);
         
         Fcb = Ext2AllocateFcb (Vcb, Mcb);
         if (Fcb) {
@@ -1711,10 +1710,6 @@ Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
             if (Ext2DerefXcb(&Fcb->ReferenceCount) == 0) {
                 Ext2FreeFcb(Fcb);
             }
-        }
-
-        if (Mcb) {
-            Ext2DerefMcb(Mcb);
         }
     }
     
