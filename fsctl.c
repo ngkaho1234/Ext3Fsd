@@ -1356,17 +1356,18 @@ out:
 VOID
 Ext2InitializeReparseBuffer(IN PREPARSE_DATA_BUFFER ReparseDataBuffer, USHORT PathBufferLength)
 {
+    ASSERT(FIELD_OFFSET(REPARSE_DATA_BUFFER, SymbolicLinkReparseBuffer.SubstituteNameOffset) == REPARSE_DATA_BUFFER_HEADER_SIZE);
     ReparseDataBuffer->ReparseTag = IO_REPARSE_TAG_SYMLINK;
     ReparseDataBuffer->ReparseDataLength = FIELD_OFFSET(REPARSE_DATA_BUFFER, SymbolicLinkReparseBuffer.PathBuffer) -
                                            FIELD_OFFSET(REPARSE_DATA_BUFFER, GenericReparseBuffer.DataBuffer) +
-                                           PathBufferLength;
+                                           PathBufferLength * 2;
     ReparseDataBuffer->Reserved = 0;
-    ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset = 0;
+    ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset = PathBufferLength;
     ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameLength = PathBufferLength;
     ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameOffset = 0;
     ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameLength = PathBufferLength;
     ReparseDataBuffer->SymbolicLinkReparseBuffer.Flags = SYMLINK_FLAG_RELATIVE;
-    RtlZeroMemory(&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer, PathBufferLength);
+    RtlZeroMemory(&ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer, PathBufferLength * 2);
 }
 
 NTSTATUS
@@ -1460,8 +1461,8 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         }
         UniName.MaximumLength = UniName.Length;
         UniName.Length = (USHORT)Ext2OEMToUnicodeSize(Vcb, &OemName);
-        Irp->IoStatus.Information = FIELD_OFFSET(REPARSE_DATA_BUFFER, SymbolicLinkReparseBuffer.PathBuffer) + UniName.Length;
-        if (UniName.MaximumLength < UniName.Length) {
+        Irp->IoStatus.Information = FIELD_OFFSET(REPARSE_DATA_BUFFER, SymbolicLinkReparseBuffer.PathBuffer) + 2 * UniName.Length;
+        if (UniName.MaximumLength < 2*UniName.Length) {
             Status = STATUS_BUFFER_TOO_SMALL;
             __leave;
         }
@@ -1472,6 +1473,8 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
              + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset);
          */
         Ext2OEMToUnicode(Vcb, &UniName, &OemName);
+        RtlMoveMemory( (PUCHAR)ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameOffset,
+                       UniName.Buffer, UniName.Length);
         
         Status = STATUS_SUCCESS;
 
