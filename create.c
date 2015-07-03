@@ -472,9 +472,11 @@ Ext2LookupFile (
                         if (S_ISDIR(Mcb->Inode.i_mode)) {
                             SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY);
                         } else {
-                            SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_NORMAL);
-                            if (!S_ISREG(Mcb->Inode.i_mode) &&
-                                    !S_ISLNK(Mcb->Inode.i_mode)) {
+                            if (S_ISREG(Mcb->Inode.i_mode)) {
+                                SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_NORMAL);
+                            } else if (S_ISLNK(Mcb->Inode.i_mode)) {
+                                SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_REPARSE_POINT);
+                            } else {
                                 SetLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
                             }
                         }
@@ -1123,7 +1125,7 @@ Dissecting:
                     __leave;
                 }
 
-                if (NonDirectoryFile) {
+                if (!OpenReparsePoint && NonDirectoryFile) {
                     Status = STATUS_FILE_IS_A_DIRECTORY;
                     Ext2DerefMcb(Mcb);
                     __leave;
