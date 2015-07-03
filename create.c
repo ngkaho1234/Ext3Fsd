@@ -395,8 +395,7 @@ Ext2LookupFile (
                     Status = STATUS_SUCCESS;
                     Parent = Mcb;
                     
-                    if (IsMcbSymLink(Mcb) && IsFileDeleted(Mcb->Target) &&
-                            (Mcb->Refercount == 1)) {
+                    if (IsMcbSymLink(Mcb) && IsFileDeleted(Mcb->Target)) {
 
                         ASSERT(Mcb->Target);
                         ASSERT(Mcb->Target->Refercount > 0);
@@ -405,8 +404,10 @@ Ext2LookupFile (
                         ClearLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
                         SetLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
                         Mcb->FileAttr = FILE_ATTRIBUTE_NORMAL;
+
                     } else {
-                        if (!IsMcbSymLink(Mcb) && S_ISLNK(Mcb->Inode.i_mode) && (Mcb->Refercount == 1)) {
+
+                        if (!IsMcbSymLink(Mcb) && S_ISLNK(Mcb->Inode.i_mode)) {
                             Ext2FollowLink( IrpContext,
                                             Vcb,
                                             Parent,
