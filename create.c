@@ -824,7 +824,7 @@ Ext2CreateFile(
                      ParentMcb,
                      &Mcb,
                      0,
-                     OpenReparsePoint);
+                     !OpenReparsePoint);
 McbExisting:
 
         if (!NT_SUCCESS(Status)) {
@@ -989,7 +989,7 @@ Dissecting:
                              ParentMcb,
                              &Mcb,
                              0,
-                             OpenReparsePoint);
+                             !OpenReparsePoint);
                 if (!NT_SUCCESS(Status)) {
                     DbgBreak();
                 }
