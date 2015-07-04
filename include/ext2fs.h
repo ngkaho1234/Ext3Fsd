@@ -1303,7 +1303,8 @@ Ext2LookupFile (
     IN PUNICODE_STRING      FullName,
     IN PEXT2_MCB            Parent,
     OUT PEXT2_MCB *         Ext2Mcb,
-    IN USHORT               Linkdep
+    IN USHORT               Linkdep,
+    IN BOOLEAN              FollowTarget
 );
 
 NTSTATUS
