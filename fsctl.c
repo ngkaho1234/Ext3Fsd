@@ -1405,7 +1405,7 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
            (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
     DeviceObject = IrpContext->DeviceObject;
     Vcb = (PEXT2_VCB) DeviceObject->DeviceExtension;
-    Mcb = Ccb->SymLink;
+    Mcb = IrpContext->Fcb->Mcb;
     Irp = IrpContext->Irp;
     IrpSp = IoGetCurrentIrpStackLocation(Irp);
     
@@ -1647,7 +1647,7 @@ Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
            (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
     DeviceObject = IrpContext->DeviceObject;
     Vcb = (PEXT2_VCB) DeviceObject->DeviceExtension;
-    Mcb = Ccb->SymLink;
+    Mcb = IrpContext->Fcb->Mcb;
     Irp = IrpContext->Irp;
     
     __try {
