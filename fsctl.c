@@ -1410,7 +1410,7 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
     IrpSp = IoGetCurrentIrpStackLocation(Irp);
     
     __try {
-        if (!Mcb || !IsMcbSymLink(Mcb)) {
+        if (!Mcb || !IsInodeSymLink(&Mcb->Inode)) {
             Status = STATUS_NOT_A_REPARSE_POINT;
             __leave;
         }
@@ -1592,6 +1592,8 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
             }
         }
 
+        SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_REPARSE_POINT);
+
         SetFlag(Mcb->Inode.i_mode, S_IFLNK);
         SetFlag(Mcb->Inode.i_mode, S_IRWXUGO);
 
@@ -1679,6 +1681,7 @@ Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         if (IsFlagOn(SUPER_BLOCK->s_feature_incompat, EXT4_FEATURE_INCOMPAT_EXTENTS)) {
             SetFlag(Mcb->Inode.i_flags, EXT4_EXTENTS_FL);
         }
+        ClearFlag(Mcb->FileAttr, FILE_ATTRIBUTE_REPARSE_POINT);
         ClearFlag(Mcb->Inode.i_flags, S_IFLNK);
         Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
     } __finally {

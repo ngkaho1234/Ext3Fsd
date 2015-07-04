@@ -449,7 +449,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             if (FATI->FileAttributes == 0) {
                 FATI->FileAttributes = FILE_ATTRIBUTE_NORMAL;
             }
-            if (IsInodeSymLink(Mcb)) {
+            if (IsInodeSymLink(&Mcb->Inode)) {
                 FATI->ReparseTag = IO_REPARSE_TAG_SYMLINK;
             } else {
                 FATI->ReparseTag = IO_REPARSE_TAG_RESERVED_ZERO;
@@ -1768,7 +1768,7 @@ Ext2SetLinkInfo(
         FileName = NewName;
 
         TargetMcb = Mcb->Parent;
-        ASSERT(!IsInodeSymLink(TargetMcb));
+        ASSERT(!IsInodeSymLink(&TargetMcb->Inode));
 
         if (TargetMcb == NULL || FileName.Length >= EXT2_NAME_LEN*2) {
             Status = STATUS_OBJECT_NAME_INVALID;
@@ -1948,7 +1948,7 @@ errorout:
 ULONG
 Ext2InodeType(PEXT2_MCB Mcb)
 {
-    if (IsInodeSymLink(Mcb)) {
+    if (IsInodeSymLink(&Mcb->Inode)) {
         return EXT2_FT_SYMLINK;
     }
 
@@ -2045,7 +2045,7 @@ Ext2DeleteFile(
                 VcbResourceAcquired = FALSE;
             }
 
-            if (IsInodeSymLink(Mcb)) {
+            if (IsInodeSymLink(&Mcb->Inode)) {
                 if (Mcb->Inode.i_nlink > 0) {
                     Status = STATUS_CANNOT_DELETE;
                     __leave;

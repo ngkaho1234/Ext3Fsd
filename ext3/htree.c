@@ -236,9 +236,6 @@ struct buffer_head *ext3_bread(struct ext2_icb *icb, struct inode *inode,
 
     PEXT2_MCB   Mcb = CONTAINING_RECORD(inode, EXT2_MCB, Inode);
 
-    /* for symlink file, read it's target instead */
-    if (NULL != Mcb && IsMcbSymLink(Mcb))
-        Mcb = Mcb->Target;
     if (NULL == Mcb) {
         *err = -EINVAL;
         return NULL;

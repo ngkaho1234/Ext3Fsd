@@ -138,8 +138,6 @@ Ext2AllocateFcb (
 {
     PEXT2_FCB Fcb;
 
-    ASSERT(!IsMcbSymLink(Mcb));
-
     Fcb = (PEXT2_FCB) ExAllocateFromNPagedLookasideList(
               &(Ext2Global->Ext2FcbLookasideList));
 
@@ -1495,10 +1493,6 @@ Ext2FreeMcb (IN PEXT2_VCB Vcb, IN PEXT2_MCB Mcb)
 
     DEBUG(DL_INF, ( "Ext2FreeMcb: Mcb %wZ will be freed.\n", &Mcb->FullName));
 
-    if (IsMcbSymLink(Mcb) && Mcb->Target) {
-        Ext2DerefMcb(Mcb->Target);
-    }
-
     if (FsRtlNumberOfRunsInLargeMcb(&Mcb->Extents)) {
         DEBUG(DL_EXT, ("List data extents for: %wZ\n", &Mcb->FullName));
         Ext2ListExtents(&Mcb->Extents);
@@ -1592,17 +1586,7 @@ Ext2SearchMcbWithoutLock(
             __leave;
         }
 
-        if (IsMcbSymLink(Parent)) {
-            if (Parent->Target) {
-                TmpMcb = Parent->Target->Child;
-                ASSERT(!IsMcbSymLink(Parent->Target));
-            } else {
-                TmpMcb = NULL;
-                __leave;
-            }
-        } else {
-            TmpMcb = Parent->Child;
-        }
+        TmpMcb = Parent->Child;
 
         while (TmpMcb) {
 
@@ -1640,12 +1624,6 @@ Ext2InsertMcb (
             &Vcb->McbLock,
             TRUE );
         LockAcquired = TRUE;
-
-        /* use it's target if it's a symlink */
-        if (IsMcbSymLink(Parent)) {
-            Parent = Parent->Target;
-            ASSERT(!IsMcbSymLink(Parent));
-        }
 
         Mcb = Parent->Child;
         while (Mcb) {
@@ -1764,9 +1742,6 @@ Ext2CleanupAllMcbs(PEXT2_VCB Vcb)
         while (Mcb = Ext2FirstUnusedMcb(Vcb, TRUE, Vcb->NumOfMcb)) {
             while (Mcb) {
                 PEXT2_MCB Next = Mcb->Next;
-                if (IsMcbSymLink(Mcb)) {
-                    Mcb->Target = NULL;
-                }
                 Ext2FreeMcb(Vcb, Mcb);
                 Mcb = Next;
             }
@@ -2934,7 +2909,7 @@ Ext2FirstUnusedMcb(PEXT2_VCB Vcb, BOOLEAN Wait, ULONG Number)
 
                 if (Mcb->Fcb == NULL && !IsMcbRoot(Mcb) &&
                         Mcb->Refercount == 0 &&
-                        (Mcb->Child == NULL || IsMcbSymLink(Mcb))) {
+                        (Mcb->Child == NULL)) {
 
                     Ext2RemoveMcb(Vcb, Mcb);
                     ClearLongFlag(Mcb->Flags, MCB_VCB_LINK);

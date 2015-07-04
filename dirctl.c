@@ -132,14 +132,6 @@ Ext2ProcessEntry(
 
         if (S_ISDIR(Inode.i_mode) || S_ISREG(Inode.i_mode)) {
         } else if (S_ISLNK(Inode.i_mode)) {
-            DEBUG(DL_RES, ("Ext2ProcessDirEntry: SymLink: %wZ\\%wZ\n",
-                           &Dcb->Mcb->FullName, pName));
-            Ext2LookupFile(IrpContext, Vcb, pName, Dcb->Mcb, &Mcb, 0);
-
-            if (Mcb && IsMcbSpecialFile(Mcb)) {
-                Ext2DerefMcb(Mcb);
-                Mcb = NULL;
-            }
         } else {
             Inode.i_size = 0;
         }
@@ -148,25 +140,10 @@ Ext2ProcessEntry(
     if (Mcb != NULL)  {
 
         FileAttributes = Mcb->FileAttr;
-        if (IsMcbSymLink(Mcb)) {
-            Target = Mcb->Target;
-            ASSERT(Target);
-            ASSERT(!IsMcbSymLink(Target));
-            if (IsMcbDirectory(Target)) {
-                FileSize = 0;
-            } else {
-                FileSize = Target->Inode.i_size;
-            }
-            if (IsFileDeleted(Target)) {
-                ClearFlag(FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
-                FileSize = 0;
-            }
+        if (IsMcbDirectory(Mcb)) {
+            FileSize = 0;
         } else {
-            if (IsMcbDirectory(Mcb)) {
-                FileSize = 0;
-            } else {
-                FileSize = Mcb->Inode.i_size;
-            }
+            FileSize = Mcb->Inode.i_size;
         }
 
     } else {
@@ -179,6 +156,8 @@ Ext2ProcessEntry(
 
         if (S_ISDIR(Inode.i_mode)) {
             FileAttributes = FILE_ATTRIBUTE_DIRECTORY;
+        } else if (S_ISLNK(Inode.i_mode)) {
+            FileAttributes = FILE_ATTRIBUTE_REPARSE_POINT;
         } else {
             FileAttributes = FILE_ATTRIBUTE_NORMAL;
         }
@@ -574,7 +553,6 @@ Ext2QueryDirectory (IN PEXT2_IRP_CONTEXT IrpContext)
             Status = STATUS_INVALID_PARAMETER;
             __leave;
         }
-        ASSERT (!IsMcbSymLink(Mcb));
 
         //
         // This request is not allowed on volumes
@@ -1236,7 +1214,7 @@ Ext2IsDirectoryEmpty (
     PEXT2_MCB           Mcb
 )
 {
-    if (!IsMcbDirectory(Mcb) || IsMcbSymLink(Mcb)) {
+    if (!IsMcbDirectory(Mcb)) {
         return TRUE;
     }
 

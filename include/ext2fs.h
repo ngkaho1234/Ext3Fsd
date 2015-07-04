@@ -1277,6 +1277,7 @@ Ext2FollowLink (
     IN PEXT2_VCB            Vcb,
     IN PEXT2_MCB            Parent,
     IN PEXT2_MCB            Mcb,
+    OUT PEXT2_MCB           *LinkTarget,
     IN USHORT               Linkdep
 );
 

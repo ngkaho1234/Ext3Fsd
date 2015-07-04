@@ -164,7 +164,6 @@ Ext2FollowLink (
                      Vcb,
                      &UniName,
                      Parent,
-                     TRUE,
                      &Target,
                      Linkdep,
                      TRUE
@@ -354,7 +353,7 @@ Ext2LookupFile (
 
                     Status = STATUS_SUCCESS;
 
-                    if (IsInodeSymLink(Mcb)) {
+                    if (IsInodeSymLink(&Mcb->Inode)) {
                         SymLinkMcb = Mcb;
                         Ext2FollowLink( IrpContext,
                                         Vcb,
@@ -395,7 +394,7 @@ Ext2LookupFile (
                     if (NT_SUCCESS(Status)) {
 
                         /* check it's real parent */
-                        ASSERT (!IsInodeSymLink(Parent));
+                        ASSERT (!IsInodeSymLink(&Parent->Inode));
 
                         /* allocate Mcb ... */
                         Mcb = Ext2AllocateMcb(Vcb, &FileName, &Parent->FullName, 0);
@@ -461,7 +460,7 @@ Ext2LookupFile (
                         Ext2LinkTailMcb(Vcb, Mcb);
                         
                         /* process symlink */
-                        if (IsInodeSymLink(Mcb)) {
+                        if (IsInodeSymLink(&Mcb->Inode)) {
                             SymLinkMcb = Mcb;
                             Ext2FollowLink( IrpContext,
                                             Vcb,
@@ -572,7 +571,7 @@ Ext2ScanDir (
         }
 
         /* parent is a symlink ? */
-        if (IsInodeSymLink(Parent)) {
+        if (IsInodeSymLink(&Parent->Inode)) {
             DbgBreak();
             Status = STATUS_NOT_A_DIRECTORY;
             __leave;
