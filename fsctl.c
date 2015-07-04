@@ -1473,7 +1473,8 @@ Ext2GetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
              + ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset);
          */
         Ext2OEMToUnicode(Vcb, &UniName, &OemName);
-        RtlMoveMemory( (PUCHAR)ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer + ReparseDataBuffer->SymbolicLinkReparseBuffer.PrintNameOffset,
+        RtlMoveMemory( (PUCHAR)ReparseDataBuffer->SymbolicLinkReparseBuffer.PathBuffer +
+                               ReparseDataBuffer->SymbolicLinkReparseBuffer.SubstituteNameOffset,
                        UniName.Buffer, UniName.Length);
         
         Status = STATUS_SUCCESS;
