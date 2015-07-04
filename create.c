@@ -68,6 +68,7 @@ Ext2FollowLink (
     IN PEXT2_VCB            Vcb,
     IN PEXT2_MCB            Parent,
     IN PEXT2_MCB            Mcb,
+    OUT PEXT2_MCB           *LinkTarget,
     IN USHORT               Linkdep
 )
 {
@@ -157,13 +158,16 @@ Ext2FollowLink (
         }
 
         /* search the real target */
+        /* Get the Mcb of the target file */
         Status = Ext2LookupFile(
                      IrpContext,
                      Vcb,
                      &UniName,
                      Parent,
+                     TRUE,
                      &Target,
-                     Linkdep
+                     Linkdep,
+                     TRUE
                  );
         if (Target == NULL) {
             Status = STATUS_LINK_FAILED;
@@ -171,40 +175,14 @@ Ext2FollowLink (
 
         if (Target == NULL /* link target doesn't exist */      ||
                 Target == Mcb  /* symlink points to itself */       ||
-                IsMcbSpecialFile(Target) /* target not resolved*/   ||
                 IsFileDeleted(Target)  /* target deleted */         ) {
 
             if (Target) {
                 ASSERT(Target->Refercount > 0);
                 Ext2DerefMcb(Target);
             }
-            ClearLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
-            SetLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
-            Mcb->FileAttr = FILE_ATTRIBUTE_NORMAL;
-            Mcb->Target = NULL;
+            Target = NULL;
 
-        } else if (IsMcbSymLink(Target)) {
-
-            ASSERT(Target->Refercount > 0);
-            ASSERT(Target->Target != NULL);
-            Ext2ReferMcb(Target->Target);
-            Mcb->Target = Target->Target;
-            Ext2DerefMcb(Target);
-            ASSERT(!IsMcbSymLink(Target->Target));
-            SetLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
-            ClearLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
-            ASSERT(Mcb->Target->Refercount > 0);
-            Mcb->FileAttr = Target->FileAttr;
-
-        } else {
-
-            Mcb->Target = Target;
-            SetLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
-            ClearLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
-            ASSERT(Mcb->Target->Refercount > 0);
-            Mcb->FileAttr = FILE_ATTRIBUTE_REPARSE_POINT;
-            if (IsMcbDirectory(Target))
-                SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY);
         }
 
     } __finally {
@@ -218,6 +196,7 @@ Ext2FollowLink (
         }
     }
 
+    *LinkTarget = Target;
     return Status;
 }
 
@@ -277,12 +256,13 @@ Ext2LookupFile (
     IN PUNICODE_STRING      FullName,
     IN PEXT2_MCB            Parent,
     OUT PEXT2_MCB *         Ext2Mcb,
-    IN USHORT               Linkdep
+    IN USHORT               Linkdep,
+    IN BOOLEAN              FollowTarget
 )
 {
     NTSTATUS        Status = STATUS_OBJECT_NAME_NOT_FOUND;
     UNICODE_STRING  FileName;
-    PEXT2_MCB       Mcb = NULL;
+    PEXT2_MCB       Mcb = NULL, SymLinkMcb = NULL;
     struct dentry  *de = NULL;
 
     USHORT          i = 0, End;
@@ -314,16 +294,6 @@ Ext2LookupFile (
         if (!IsMcbDirectory(Parent)) {
             Status =  STATUS_NOT_A_DIRECTORY;
             __leave;
-        }
-
-        /* use symlink's target as parent directory */
-        if (IsMcbSymLink(Parent)) {
-            Parent = Parent->Target;
-            ASSERT(!IsMcbSymLink(Parent));
-            if (IsFileDeleted(Parent)) {
-                Status =  STATUS_NOT_A_DIRECTORY;
-                __leave;
-            }
         }
 
         if (NULL == Parent) {
@@ -366,23 +336,11 @@ Ext2LookupFile (
                 FileName.Buffer += Start;
                 FileName.Length = (USHORT)((i - Start) * 2);
 
-                /* make sure the parent is NULL */
-                if (!IsMcbDirectory(Parent)) {
+                /* make sure the parent is valid */
+                if (!Parent || !IsMcbDirectory(Parent)) {
                     Status =  STATUS_NOT_A_DIRECTORY;
                     Ext2DerefMcb(Parent);
                     break;
-                }
-
-                if (IsMcbSymLink(Parent)) {
-                    if (IsFileDeleted(Parent->Target)) {
-                        Status =  STATUS_NOT_A_DIRECTORY;
-                        Ext2DerefMcb(Parent);
-                        break;
-                    } else {
-                        Ext2ReferMcb(Parent->Target);
-                        Ext2DerefMcb(Parent);
-                        Parent = Parent->Target;
-                    }
                 }
 
                 /* search cached Mcb nodes */
@@ -390,32 +348,24 @@ Ext2LookupFile (
 
                 if (Mcb) {
 
-                    /* derefer the parent Mcb */
-                    Ext2DerefMcb(Parent);
                     Status = STATUS_SUCCESS;
-                    Parent = Mcb;
-                    
-                    if (IsMcbSymLink(Mcb) && IsFileDeleted(Mcb->Target)) {
 
-                        ASSERT(Mcb->Target);
-                        ASSERT(Mcb->Target->Refercount > 0);
-                        Ext2DerefMcb(Mcb->Target);
-                        Mcb->Target = NULL;
-                        ClearLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
-                        SetLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
-                        Mcb->FileAttr = FILE_ATTRIBUTE_NORMAL;
-
-                    } else {
-
-                        if (!IsMcbSymLink(Mcb) && S_ISLNK(Mcb->Inode.i_mode)) {
-                            Ext2FollowLink( IrpContext,
-                                            Vcb,
-                                            Parent,
-                                            Mcb,
-                                            Linkdep+1
-                                          );
-                        }
+                    if (IsInodeSymLink(Mcb)) {
+                        SymLinkMcb = Mcb;
+                        Ext2FollowLink( IrpContext,
+                                        Vcb,
+                                        Parent,
+                                        SymLinkMcb,
+                                        &Mcb,
+                                        Linkdep+1
+                                      );
                     }
+
+                    /* it's safe to deref Parent Mcb */
+                    Ext2DerefMcb(Parent);
+
+                    /* set parent to preare re-scan */
+                    Parent = Mcb;
 
                 } else {
 
@@ -441,7 +391,7 @@ Ext2LookupFile (
                     if (NT_SUCCESS(Status)) {
 
                         /* check it's real parent */
-                        ASSERT (!IsMcbSymLink(Parent));
+                        ASSERT (!IsInodeSymLink(Parent));
 
                         /* allocate Mcb ... */
                         Mcb = Ext2AllocateMcb(Vcb, &FileName, &Parent->FullName, 0);
@@ -497,27 +447,29 @@ Ext2LookupFile (
                         Mcb->LastWriteTime = Ext2NtTime(Mcb->Inode.i_mtime);
                         Mcb->ChangeTime = Ext2NtTime(Mcb->Inode.i_mtime);
 
-                        /* process symlink */
-                        if (S_ISLNK(Mcb->Inode.i_mode)) {
-                            Ext2FollowLink( IrpContext,
-                                            Vcb,
-                                            Parent,
-                                            Mcb,
-                                            Linkdep+1
-                                          );
-                        }
-
                         /* add reference ... */
                         Ext2ReferMcb(Mcb);
 
                         /* add Mcb to it's parent tree*/
                         Ext2InsertMcb(Vcb, Parent, Mcb);
 
-                        /* it's safe to deref Parent Mcb */
-                        Ext2DerefMcb(Parent);
-
                         /* linking this Mcb*/
                         Ext2LinkTailMcb(Vcb, Mcb);
+                        
+                        /* process symlink */
+                        if (IsInodeSymLink(Mcb)) {
+                            SymLinkMcb = Mcb;
+                            Ext2FollowLink( IrpContext,
+                                            Vcb,
+                                            Parent,
+                                            SymLinkMcb,
+                                            &Mcb,
+                                            Linkdep+1
+                                          );
+                        }
+
+                        /* it's safe to deref Parent Mcb */
+                        Ext2DerefMcb(Parent);
 
                         /* set parent to preare re-scan */
                         Parent = Mcb;
@@ -546,7 +498,25 @@ Ext2LookupFile (
             Ext2FreeEntry(de);
         }
 
+        *Ext2Mcb = NULL;
+        
+        if (FollowTarget && !Mcb) {
+            if (SymLinkMcb) {
+                Ext2DerefMcb(SymLinkMcb);
+            }
+            Status = STATUS_OBJECT_NAME_NOT_FOUND;
+        }
+
         if (NT_SUCCESS(Status)) {
+            if (SymLinkMcb) {
+                if (FollowTarget) {
+                    Ext2DerefMcb(SymLinkMcb);
+                    SymLinkMcb = NULL;
+                } else {
+                    Ext2DerefMcb(Mcb);
+                    Mcb = SymLinkMcb;
+                }
+            }
             if (bDirectory) {
                 if (IsMcbDirectory(Mcb)) {
                     *Ext2Mcb = Mcb;
@@ -555,7 +525,7 @@ Ext2LookupFile (
                     Status = STATUS_NOT_A_DIRECTORY;
                 }
             } else {
-                *Ext2Mcb = Mcb;
+                    *Ext2Mcb = Mcb;
             }
         }
 
@@ -598,17 +568,10 @@ Ext2ScanDir (
         }
 
         /* parent is a symlink ? */
-        if IsMcbSymLink(Parent) {
-            if (Parent->Target) {
-                Ext2ReferMcb(Parent->Target);
-                Ext2DerefMcb(Parent);
-                Parent = Parent->Target;
-                ASSERT(!IsMcbSymLink(Parent));
-            } else {
-                DbgBreak();
-                Status = STATUS_NOT_A_DIRECTORY;
-                __leave;
-            }
+        if (IsInodeSymLink(Parent)) {
+            DbgBreak();
+            Status = STATUS_NOT_A_DIRECTORY;
+            __leave;
         }
 
         de = Ext2BuildEntry(Vcb, Parent, FileName);
@@ -857,7 +820,8 @@ Ext2CreateFile(
                      &FileName,
                      ParentMcb,
                      &Mcb,
-                     0 );
+                     0,
+                     OpenReparsePoint);
 McbExisting:
 
         if (!NT_SUCCESS(Status)) {
@@ -913,7 +877,8 @@ Dissecting:
                              &RealName,
                              ParentMcb,
                              &RetMcb,
-                             0);
+                             0,
+                             TRUE);
 
                 /* quit name resolving loop */
                 if (!NT_SUCCESS(Status)) {
@@ -929,14 +894,6 @@ Dissecting:
                 /* RetMcb is already refered */
                 ParentMcb = RetMcb;
                 PathName  = RemainName;
-
-                /* symlink must use it's target */
-                if (IsMcbSymLink(ParentMcb)) {
-                    Ext2ReferMcb(ParentMcb->Target);
-                    Ext2DerefMcb(ParentMcb);
-                    ParentMcb = ParentMcb->Target;
-                    ASSERT(!IsMcbSymLink(ParentMcb));
-                }
 
                 goto Dissecting;
             }
@@ -1028,7 +985,8 @@ Dissecting:
                              &RealName,
                              ParentMcb,
                              &Mcb,
-                             0);
+                             0,
+                             OpenReparsePoint);
                 if (!NT_SUCCESS(Status)) {
                     DbgBreak();
                 }
@@ -1159,22 +1117,6 @@ Openit:
         if (Mcb) {
 
             ASSERT(Mcb->Refercount > 0);
-
-            /* refer it's target if it's a symlink, so both refered */
-            if (IsMcbSymLink(Mcb)) {
-                if (IsFileDeleted(Mcb->Target)) {
-                    DbgBreak();
-                    SetLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
-                    ClearLongFlag(Mcb->Flags, MCB_TYPE_SYMLINK);
-                    Ext2DerefMcb(Mcb->Target);
-                    Mcb->Target = NULL;
-                } else {
-                    SymLink = Mcb;
-                    Mcb = Mcb->Target;
-                    Ext2ReferMcb(Mcb);
-                    ASSERT (!IsMcbSymLink(Mcb));
-                }
-            }
 
             // Check readonly flag
             if (BooleanFlagOn(DesiredAccess,  FILE_GENERIC_READ) &&
