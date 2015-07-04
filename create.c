@@ -338,9 +338,11 @@ Ext2LookupFile (
 
                 /* make sure the parent is valid */
                 if (!Parent || !IsMcbDirectory(Parent)) {
-                    Status =  STATUS_NOT_A_DIRECTORY;
                     if (Parent) {
                         Ext2DerefMcb(Parent);
+                        Status = STATUS_NOT_A_DIRECTORY;
+                    } else {
+                        Status = STATUS_OBJECT_PATH_NOT_FOUND;
                     }
                     break;
                 }
