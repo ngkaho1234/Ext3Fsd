@@ -313,9 +313,6 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             FileBasicInformation->ChangeTime = Mcb->ChangeTime;
 
             FileBasicInformation->FileAttributes = Mcb->FileAttr;
-            if (IsMcbSymLink(Mcb) && IsFileDeleted(Mcb->Target)) {
-                ClearFlag(FileBasicInformation->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
-            }
             if (FileBasicInformation->FileAttributes == 0) {
                 FileBasicInformation->FileAttributes = FILE_ATTRIBUTE_NORMAL;
             }
@@ -452,7 +449,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             if (FATI->FileAttributes == 0) {
                 FATI->FileAttributes = FILE_ATTRIBUTE_NORMAL;
             }
-            if (IsMcbSymLink(Mcb)) {
+            if (IsInodeSymLink(Mcb)) {
                 FATI->ReparseTag = IO_REPARSE_TAG_SYMLINK;
             } else {
                 FATI->ReparseTag = IO_REPARSE_TAG_RESERVED_ZERO;
@@ -740,10 +737,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 Status = STATUS_SUCCESS;
             }
 
-            /* set Mcb to it's target */
-            if (IsMcbSymLink(Mcb)) {
-                ASSERT(Fcb->Mcb == Mcb->Target);
-            }
             Mcb = Fcb->Mcb;
 
             /* get user specified allocationsize aligned with BLOCK_SIZE */
@@ -819,10 +812,6 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
                 Status = STATUS_SUCCESS;
             }
 
-            /* set Mcb to it's target */
-            if (IsMcbSymLink(Mcb)) {
-                ASSERT(Fcb->Mcb == Mcb->Target);
-            }
             Mcb = Fcb->Mcb;
 
             OldSize = Fcb->Header.AllocationSize;
@@ -1431,10 +1420,6 @@ Ext2SetRenameInfo(
         FileName = NewName;
 
         TargetMcb = Mcb->Parent;
-        if (IsMcbSymLink(TargetMcb)) {
-            TargetMcb = TargetMcb->Target;
-            ASSERT(!IsMcbSymLink(TargetMcb));
-        }
 
         if (TargetMcb == NULL || FileName.Length >= EXT2_NAME_LEN*2) {
             Status = STATUS_OBJECT_NAME_INVALID;
@@ -1517,7 +1502,8 @@ Ext2SetRenameInfo(
                  &FileName,
                  TargetMcb,
                  &ExistingMcb,
-                 0
+                 0,
+                 FALSE
              );
 
     if (NT_SUCCESS(Status) && ExistingMcb != Mcb) {
@@ -1531,7 +1517,7 @@ Ext2SetRenameInfo(
 
         } else {
 
-            if ( (ExistingFcb = ExistingMcb->Fcb) && !IsMcbSymLink(ExistingMcb) ) {
+            if (ExistingFcb = ExistingMcb->Fcb) {
 
                 Status = Ext2IsFileRemovable(IrpContext, Vcb, ExistingFcb, Ccb);
                 if (!NT_SUCCESS(Status)) {
@@ -1782,10 +1768,7 @@ Ext2SetLinkInfo(
         FileName = NewName;
 
         TargetMcb = Mcb->Parent;
-        if (IsMcbSymLink(TargetMcb)) {
-            TargetMcb = TargetMcb->Target;
-            ASSERT(!IsMcbSymLink(TargetMcb));
-        }
+        ASSERT(!IsInodeSymLink(TargetMcb));
 
         if (TargetMcb == NULL || FileName.Length >= EXT2_NAME_LEN*2) {
             Status = STATUS_OBJECT_NAME_INVALID;
@@ -1859,7 +1842,7 @@ Ext2SetLinkInfo(
                    &TargetMcb->FullName, &FileName, &Mcb->FullName));
 
     Status = Ext2LookupFile(IrpContext, Vcb, &FileName,
-                            TargetMcb, &ExistingMcb, 0);
+                            TargetMcb, &ExistingMcb, 0, FALSE);
     if (NT_SUCCESS(Status) && ExistingMcb != Mcb) {
 
         if (!ReplaceIfExists) {
@@ -1871,7 +1854,7 @@ Ext2SetLinkInfo(
 
         } else {
 
-            if ( (ExistingFcb = ExistingMcb->Fcb) && !IsMcbSymLink(ExistingMcb) ) {
+            if (ExistingFcb = ExistingMcb->Fcb) {
                 Status = Ext2IsFileRemovable(IrpContext, Vcb, ExistingFcb, Ccb);
                 if (!NT_SUCCESS(Status)) {
                     DEBUG(DL_REN, ("Ext2SetRenameInfo: Target file %wZ cannot be removed.\n",
@@ -1912,7 +1895,7 @@ Ext2SetLinkInfo(
 
     if (NT_SUCCESS(Status)) {
 
-        Ext2LookupFile(IrpContext, Vcb, &FileName, TargetMcb, &LinkMcb, 0);
+        Ext2LookupFile(IrpContext, Vcb, &FileName, TargetMcb, &LinkMcb, 0, FALSE);
         if (!LinkMcb)
             goto errorout;
 
@@ -1965,7 +1948,7 @@ errorout:
 ULONG
 Ext2InodeType(PEXT2_MCB Mcb)
 {
-    if (IsMcbSymLink(Mcb)) {
+    if (IsInodeSymLink(Mcb)) {
         return EXT2_FT_SYMLINK;
     }
 
@@ -2009,7 +1992,7 @@ Ext2DeleteFile(
         return STATUS_ACCESS_DENIED;
     }
 
-    if (!IsMcbSymLink(Mcb) && IsMcbDirectory(Mcb)) {
+    if (IsMcbDirectory(Mcb)) {
         if (!Ext2IsDirectoryEmpty(IrpContext, Vcb, Mcb)) {
             return STATUS_DIRECTORY_NOT_EMPTY;
         }
@@ -2062,7 +2045,7 @@ Ext2DeleteFile(
                 VcbResourceAcquired = FALSE;
             }
 
-            if (IsMcbSymLink(Mcb)) {
+            if (IsInodeSymLink(Mcb)) {
                 if (Mcb->Inode.i_nlink > 0) {
                     Status = STATUS_CANNOT_DELETE;
                     __leave;
