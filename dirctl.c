@@ -93,6 +93,8 @@ Ext2ProcessEntry(
     LONGLONG FileSize = 0;
     LONGLONG AllocationSize;
     ULONG   FileAttributes = 0;
+    
+    BOOLEAN IsEntrySymlink = FALSE;
 
     *EntrySize = 0;
     NameLength = pName->Length;
@@ -145,6 +147,10 @@ Ext2ProcessEntry(
         } else {
             FileSize = Mcb->Inode.i_size;
         }
+        
+        if (IsInodeSymLink(&Mcb->Inode)) {
+            IsEntrySymlink = TRUE;
+        }
 
     } else {
 
@@ -158,12 +164,32 @@ Ext2ProcessEntry(
             FileAttributes = FILE_ATTRIBUTE_DIRECTORY;
         } else if (S_ISLNK(Inode.i_mode)) {
             FileAttributes = FILE_ATTRIBUTE_REPARSE_POINT;
+            IsEntrySymlink = TRUE;
         } else {
             FileAttributes = FILE_ATTRIBUTE_NORMAL;
         }
 
         if (!Ext2CheckPermissionAllowedInode(Vcb, &Inode, Ext2FileCanWrite)) {
             SetFlag(FileAttributes, FILE_ATTRIBUTE_READONLY);
+        }
+    }
+    
+    if (IsEntrySymlink) {
+        Status = Ext2LookupFile( IrpContext, 
+                                 Vcb,
+                                 pName,
+                                 Dcb->Mcb,
+                                 &Target,
+                                 0,
+                                 TRUE);
+        if (NT_SUCCESS(Status)) {
+            ASSERT(!IsInodeSymLink(&Target->Inode));
+            if (IsMcbDirectory(Target)) {
+                SetFlag(FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
+            } else {
+                SetFlag(FileAttributes, FILE_ATTRIBUTE_NORMAL);
+            }
+            Ext2DerefMcb(Target);
         }
     }
 
