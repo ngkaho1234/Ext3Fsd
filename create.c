@@ -516,7 +516,9 @@ Ext2LookupFile (
                     Ext2DerefMcb(SymLinkMcb);
                     SymLinkMcb = NULL;
                 } else {
-                    Ext2DerefMcb(Mcb);
+                    if (Mcb) {
+                        Ext2DerefMcb(Mcb);
+                    }
                     Mcb = SymLinkMcb;
                 }
             }
@@ -528,7 +530,7 @@ Ext2LookupFile (
                     Status = STATUS_NOT_A_DIRECTORY;
                 }
             } else {
-                    *Ext2Mcb = Mcb;
+                *Ext2Mcb = Mcb;
             }
         }
 
