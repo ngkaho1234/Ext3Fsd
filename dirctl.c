@@ -175,6 +175,7 @@ Ext2ProcessEntry(
     }
     
     if (IsEntrySymlink) {
+        FileSize = 0;
         Status = Ext2LookupFile( IrpContext, 
                                  Vcb,
                                  pName,
@@ -258,8 +259,14 @@ Ext2ProcessEntry(
 
         if (FIF) {
             FIF->FileId.QuadPart = (LONGLONG) in;
+            if (IsEntrySymlink) {
+                FIF->EaSize = IO_REPARSE_TAG_SYMLINK;
+            }
             RtlCopyMemory(&FIF->FileName[0], &pName->Buffer[0], NameLength);
         } else if (FFI) {
+            if (IsEntrySymlink) {
+                FFI->EaSize = IO_REPARSE_TAG_SYMLINK;
+            }
             RtlCopyMemory(&FFI->FileName[0], &pName->Buffer[0], NameLength);
         } else {
             RtlCopyMemory(&FDI->FileName[0], &pName->Buffer[0], NameLength);
@@ -306,6 +313,9 @@ Ext2ProcessEntry(
 
         if (FIB) {
             FIB->FileId.QuadPart = (LONGLONG)in;
+            if (IsEntrySymlink) {
+                FIB->EaSize = IO_REPARSE_TAG_SYMLINK;
+            }
             RtlCopyMemory(&FIB->FileName[0], &pName->Buffer[0], NameLength);
         } else {
             RtlCopyMemory(&FBI->FileName[0], &pName->Buffer[0], NameLength);
