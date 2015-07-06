@@ -191,6 +191,7 @@ Ext2ProcessEntry(
             }
             Ext2DerefMcb(Target);
         }
+        Status = STATUS_SUCCESS;
     }
 
     if (FileAttributes == 0)
