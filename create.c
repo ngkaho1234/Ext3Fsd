@@ -471,14 +471,14 @@ Ext2LookupFile (
                                           );
                             if (Mcb) {
                                 if (S_ISDIR(Mcb->Inode.i_mode)) {
-                                    SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY);
+                                    SetFlag(SymLinkMcb->FileAttr, FILE_ATTRIBUTE_DIRECTORY);
                                 } else {
                                     if (S_ISREG(Mcb->Inode.i_mode)) {
-                                        SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_NORMAL);
+                                        SetFlag(SymLinkMcb->FileAttr, FILE_ATTRIBUTE_NORMAL);
                                     } else if (S_ISLNK(Mcb->Inode.i_mode)) {
-                                        SetFlag(Mcb->FileAttr, FILE_ATTRIBUTE_REPARSE_POINT);
+                                        SetFlag(SymLinkMcb->FileAttr, FILE_ATTRIBUTE_REPARSE_POINT);
                                     } else {
-                                        SetLongFlag(Mcb->Flags, MCB_TYPE_SPECIAL);
+                                        SetLongFlag(SymLinkMcb->Flags, MCB_TYPE_SPECIAL);
                                     }
                                 }
                             }
