@@ -1089,7 +1089,7 @@ Dissecting:
                 }
 
                 /* ignore NonDirectoryFile for reparse-point-open of symlinks */
-                if (!(Mcb->Target && OpenReparsePoint) && NonDirectoryFile) {
+                if (NonDirectoryFile) {
                     Status = STATUS_FILE_IS_A_DIRECTORY;
                     Ext2DerefMcb(Mcb);
                     __leave;
