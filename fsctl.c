@@ -1512,6 +1512,7 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
     PEXT2_MCB           Mcb = NULL;
 
     NTSTATUS            Status = STATUS_UNSUCCESSFUL;
+    BOOLEAN             bNewParentDcb = FALSE;
     BOOLEAN             MainResourceAcquired = FALSE;
     
     PVOID               InputBuffer;
@@ -1526,6 +1527,9 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
     PCHAR           OemNameBuffer = NULL;
     int             OemNameLength = 0, i;
 
+    PEXT2_FCB           ParentDcb = NULL;   /* Dcb of it's current parent */
+    PEXT2_MCB           ParentMcb = NULL;
+
     Ccb = IrpContext->Ccb;
     ASSERT(Ccb != NULL);
     ASSERT((Ccb->Identifier.Type == EXT2CCB) &&
@@ -1536,7 +1540,17 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
     Mcb = Fcb->Mcb;
     Irp = IrpContext->Irp;
     IrpSp = IoGetCurrentIrpStackLocation(Irp);
-    
+
+    ParentMcb = Mcb->Parent;
+    ParentDcb = ParentMcb->Fcb;
+    if (ParentDcb == NULL) {
+        ParentDcb = Ext2AllocateFcb(Vcb, ParentMcb);
+        if (ParentDcb) {
+            Ext2ReferXcb(&ParentDcb->ReferenceCount);
+            bNewParentDcb = TRUE;
+        }
+    }
+
     __try {
         if (!Mcb)
             __leave;
@@ -1601,6 +1615,9 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
 
         Status = Ext2WriteSymlinkInode(IrpContext, Vcb, Mcb, 0, OemNameBuffer, OemNameLength, &BytesWritten);
+        if (NT_SUCCESS(Status)) {
+            Status = Ext2UpdateEntryFileType(IrpContext, Vcb, ParentDcb, Mcb);
+        }
     } __finally {
         if (MainResourceAcquired) {
             ExReleaseResourceLite(&Fcb->MainResource);
@@ -1608,6 +1625,26 @@ Ext2SetSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         
         if (OemNameBuffer) {
             Ext2FreePool(OemNameBuffer, 'NL2E');
+        }
+        
+        if (NT_SUCCESS(Status)) {
+            Ext2NotifyReportChange(
+                IrpContext,
+                Vcb,
+                Mcb,
+                FILE_NOTIFY_CHANGE_ATTRIBUTES,
+                FILE_ACTION_MODIFIED );
+
+        }
+
+        if (bNewParentDcb) {
+            ASSERT(ParentDcb != NULL);
+            if (Ext2DerefXcb(&ParentDcb->ReferenceCount) == 0) {
+                Ext2FreeFcb(ParentDcb);
+                ParentDcb = NULL;
+            } else {
+                DEBUG(DL_RES, ( "Ext2SetRenameInfo: ParentDcb is resued by other threads.\n"));
+            }
         }
 
         if (!AbnormalTermination()) {
@@ -1637,9 +1674,13 @@ Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
     PEXT2_MCB           Mcb = NULL;
 
     NTSTATUS            Status = STATUS_UNSUCCESSFUL;
+    BOOLEAN             bNewParentDcb = FALSE;
     BOOLEAN             bFcbAllocated = FALSE;
     BOOLEAN             MainResourceAcquired = FALSE;
     LARGE_INTEGER       NewSize;
+    
+    PEXT2_FCB           ParentDcb = NULL;   /* Dcb of it's current parent */
+    PEXT2_MCB           ParentMcb = NULL;
 
     Ccb = IrpContext->Ccb;
     ASSERT(Ccb != NULL);
@@ -1649,7 +1690,17 @@ Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
     Vcb = (PEXT2_VCB) DeviceObject->DeviceExtension;
     Mcb = IrpContext->Fcb->Mcb;
     Irp = IrpContext->Irp;
-    
+
+    ParentMcb = Mcb->Parent;
+    ParentDcb = ParentMcb->Fcb;
+    if (ParentDcb == NULL) {
+        ParentDcb = Ext2AllocateFcb(Vcb, ParentMcb);
+        if (ParentDcb) {
+            Ext2ReferXcb(&ParentDcb->ReferenceCount);
+            bNewParentDcb = TRUE;
+        }
+    }
+
     __try {
         if (!Mcb) {
             Status = STATUS_NOT_A_REPARSE_POINT;
@@ -1684,9 +1735,32 @@ Ext2DeleteSymlink (IN PEXT2_IRP_CONTEXT IrpContext)
         ClearFlag(Mcb->FileAttr, FILE_ATTRIBUTE_REPARSE_POINT);
         ClearFlag(Mcb->Inode.i_flags, S_IFLNK);
         Ext2SaveInode(IrpContext, Vcb, &Mcb->Inode);
+        if (NT_SUCCESS(Status)) {
+            Status = Ext2UpdateEntryFileType(IrpContext, Vcb, ParentDcb, Mcb);
+        }
     } __finally {
         if (MainResourceAcquired) {
             ExReleaseResourceLite(&Fcb->MainResource);
+        }
+        
+        if (NT_SUCCESS(Status)) {
+            Ext2NotifyReportChange(
+                IrpContext,
+                Vcb,
+                Mcb,
+                FILE_NOTIFY_CHANGE_ATTRIBUTES,
+                FILE_ACTION_MODIFIED );
+
+        }
+        
+        if (bNewParentDcb) {
+            ASSERT(ParentDcb != NULL);
+            if (Ext2DerefXcb(&ParentDcb->ReferenceCount) == 0) {
+                Ext2FreeFcb(ParentDcb);
+                ParentDcb = NULL;
+            } else {
+                DEBUG(DL_RES, ( "Ext2SetRenameInfo: ParentDcb is resued by other threads.\n"));
+            }
         }
 
         if (!AbnormalTermination()) {

@@ -834,12 +834,8 @@ struct _EXT2_MCB {
 
     // Link List Info
     PEXT2_MCB                       Parent; // Parent
-    PEXT2_MCB                       Next;   // Brothers
-
-    union {
-        PEXT2_MCB                   Child;  // Children Mcb nodes
-        PEXT2_MCB                   Target; // Target Mcb of symlink
-    };
+    PEXT2_MCB                       Next;   // Siblings
+    PEXT2_MCB                       Child;  // Children Mcb nodes
 
     // Mcb Node Info
 
@@ -1887,6 +1883,14 @@ Ext2AddEntry (
     IN struct inode       *Inode,
     IN PUNICODE_STRING     FileName,
     OUT struct dentry    **dentry
+);
+
+NTSTATUS
+Ext2UpdateEntryFileType (
+    IN PEXT2_IRP_CONTEXT    IrpContext,
+    IN PEXT2_VCB            Vcb,
+    IN PEXT2_FCB            Dcb,
+    IN PEXT2_MCB            Mcb
 );
 
 NTSTATUS
