@@ -1101,7 +1101,6 @@ Dissecting:
                     __leave;
                 }
 
-                /* ignore NonDirectoryFile for reparse-point-open of symlinks */
                 if (NonDirectoryFile) {
                     Status = STATUS_FILE_IS_A_DIRECTORY;
                     Ext2DerefMcb(Mcb);
