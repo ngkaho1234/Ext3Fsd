@@ -1864,9 +1864,14 @@ Ext2CreateInode(
         DbgBreak();
     }
 
-    /* Force using extent */
     if (IsFlagOn(SUPER_BLOCK->s_feature_incompat, EXT4_FEATURE_INCOMPAT_EXTENTS)) {
-        SetFlag(Inode.i_flags, EXT4_EXTENTS_FL);
+        /* using extent */
+        Inode.i_flags |= EXT2_EXTENTS_FL;
+        ext4_ext_tree_init(IrpContext, NULL, &Inode);
+        /* ext4_ext_tree_init will save inode body */
+    } else {
+        /* save inode body to cache */
+        Ext2SaveInode(IrpContext, Vcb, &Inode);
     }
 
     /* add new entry to its parent */
