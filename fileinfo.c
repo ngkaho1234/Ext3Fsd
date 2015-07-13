@@ -102,9 +102,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
         ASSERT(Ccb != NULL);
         ASSERT((Ccb->Identifier.Type == EXT2CCB) &&
                (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
-        Mcb = Ccb->SymLink;
-        if (!Mcb)
-            Mcb = Fcb->Mcb;
+        Mcb = Fcb->Mcb;
 
         if (Mcb->Parent && !Ext2CheckPermissionAllowed(Vcb, Mcb->Parent, Ext2FileCanRead)) {
             Status = STATUS_ACCESS_DENIED;
@@ -139,9 +137,6 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             FileBasicInformation->ChangeTime = Mcb->ChangeTime;
 
             FileBasicInformation->FileAttributes = Mcb->FileAttr;
-            if (IsLinkInvalid(Mcb)) {
-                ClearFlag(FileBasicInformation->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
-            }
             if (FileBasicInformation->FileAttributes == 0) {
                 FileBasicInformation->FileAttributes = FILE_ATTRIBUTE_NORMAL;
             }
@@ -169,11 +164,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             else
                 FSI->DeletePending = IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING);
 
-            if (IsLinkInvalid(Mcb)) {
-                FSI->Directory = FALSE;
-                FSI->AllocationSize.QuadPart = 0;
-                FSI->EndOfFile.QuadPart = 0;
-            } else if (IsMcbDirectory(Mcb)) {
+            if (IsMcbDirectory(Mcb)) {
                 FSI->Directory = TRUE;
                 FSI->AllocationSize.QuadPart = 0;
                 FSI->EndOfFile.QuadPart = 0;
@@ -324,11 +315,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             else
                 FSI->DeletePending = IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING);
 
-            if (IsLinkInvalid(Mcb)) {
-                FSI->Directory = FALSE;
-                FSI->AllocationSize.QuadPart = 0;
-                FSI->EndOfFile.QuadPart = 0;
-            } else if (IsDirectory(Fcb)) {
+            if (IsDirectory(Fcb)) {
                 FSI->Directory = TRUE;
                 FSI->AllocationSize.QuadPart = 0;
                 FSI->EndOfFile.QuadPart = 0;
@@ -402,11 +389,7 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
             PFNOI = (PFILE_NETWORK_OPEN_INFORMATION) Buffer;
 
             PFNOI->FileAttributes = Mcb->FileAttr;
-            if (IsLinkInvalid(Mcb)) {
-                ClearFlag(PFNOI->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
-                PFNOI->AllocationSize.QuadPart = 0;
-                PFNOI->EndOfFile.QuadPart = 0;
-            } else if (IsDirectory(Fcb)) {
+            if (IsDirectory(Fcb)) {
                 PFNOI->AllocationSize.QuadPart = 0;
                 PFNOI->EndOfFile.QuadPart = 0;
             } else {
@@ -443,9 +426,6 @@ Ext2QueryFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
 
             FATI = (PFILE_ATTRIBUTE_TAG_INFORMATION) Buffer;
             FATI->FileAttributes = Mcb->FileAttr;
-            if (IsLinkInvalid(Mcb)) {
-                ClearFlag(FATI->FileAttributes, FILE_ATTRIBUTE_DIRECTORY);
-            }
             if (FATI->FileAttributes == 0) {
                 FATI->FileAttributes = FILE_ATTRIBUTE_NORMAL;
             }
@@ -592,15 +572,7 @@ Ext2SetFileInformation (IN PEXT2_IRP_CONTEXT IrpContext)
         ASSERT(Ccb != NULL);
         ASSERT((Ccb->Identifier.Type == EXT2CCB) &&
                (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
-        Mcb = Ccb->SymLink;
-        if (Mcb) {
-            if (IsFlagOn(Mcb->Flags, MCB_FILE_DELETED)) {
-                Status = STATUS_FILE_DELETED;
-                __leave;
-            }
-        } else {
-            Mcb = Fcb->Mcb;
-        }
+        Mcb = Fcb->Mcb;
 
         if ( !IsDirectory(Fcb) && !FlagOn(Fcb->Flags, FCB_PAGE_FILE) &&
                 ((FileInformationClass == FileEndOfFileInformation) ||
@@ -1322,10 +1294,7 @@ Ext2SetDispositionInfo(
         DEBUG(DL_INF, ( "Ext2SetDispositionInformation: Removing %wZ.\n",
                         &Mcb->FullName));
 
-        /* always allow deleting on symlinks */
-        if (Ccb->SymLink == NULL) {
-            status = Ext2IsFileRemovable(IrpContext, Vcb, Fcb, Ccb);
-        }
+        status = Ext2IsFileRemovable(IrpContext, Vcb, Fcb, Ccb);
 
         if (NT_SUCCESS(status)) {
             SetLongFlag(Fcb->Flags, FCB_DELETE_PENDING);
@@ -1379,10 +1348,6 @@ Ext2SetRenameInfo(
     BOOLEAN                 bNewParentDcb = FALSE;
 
     PFILE_RENAME_INFORMATION    FRI;
-
-    if (Ccb->SymLink) {
-        Mcb = Ccb->SymLink;
-    }
 
     if (Mcb->Inode.i_ino == EXT2_ROOT_INO) {
         Status = STATUS_INVALID_PARAMETER;
@@ -1727,10 +1692,6 @@ Ext2SetLinkInfo(
     BOOLEAN                 bNewParentDcb = FALSE;
 
     PFILE_LINK_INFORMATION  FLI;
-
-    if (Ccb->SymLink) {
-        Mcb = Ccb->SymLink;
-    }
 
     if (IsMcbDirectory(Mcb)) {
         Status = STATUS_INVALID_PARAMETER;

@@ -273,11 +273,7 @@ Ext2FastIoQueryBasicInfo (
                 __leave;
             }
             Ccb = (PEXT2_CCB) FileObject->FsContext2;
-            if (Ccb && Ccb->SymLink) {
-                Mcb = Ccb->SymLink;
-            } else {
-                Mcb = Fcb->Mcb;
-            }
+            Mcb = Fcb->Mcb;
             ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                    (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
 #if EXT2_DEBUG
@@ -915,10 +911,7 @@ Ext2FastIoQueryNetworkOpenInfo (
         ASSERT((Fcb->Identifier.Type == EXT2FCB) &&
                (Fcb->Identifier.Size == sizeof(EXT2_FCB)));
         Ccb = (PEXT2_CCB) FileObject->FsContext2;
-        if (Ccb && Ccb->SymLink)
-            Mcb = Ccb->SymLink;
-        else
-            Mcb = Fcb->Mcb;
+        Mcb = Fcb->Mcb;
 
 #if EXT2_DEBUG
         DEBUG(DL_INF, (

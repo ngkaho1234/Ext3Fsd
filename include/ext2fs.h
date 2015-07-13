@@ -237,7 +237,6 @@ Ext2ClearFlag(PULONG Flags, ULONG FlagBit)
 
 #define IsDirectory(Fcb)    IsMcbDirectory((Fcb)->Mcb)
 #define IsSpecialFile(Fcb)  IsMcbSpecialFile((Fcb)->Mcb)
-#define IsSymLink(Fcb)      IsMcbSymLink((Fcb)->Mcb)
 #define IsInodeSymLink(I)   S_ISLNK((I)->i_mode)
 #define IsRoot(Fcb)         IsMcbRoot((Fcb)->Mcb)
 
@@ -894,7 +893,6 @@ struct _EXT2_MCB {
 #define IsMcbDirectory(Mcb)     IsFlagOn((Mcb)->FileAttr, FILE_ATTRIBUTE_DIRECTORY)
 #define IsFileDeleted(Mcb)      IsFlagOn((Mcb)->Flags, MCB_FILE_DELETED)
 
-#define IsLinkInvalid(Mcb)      (IsMcbSymLink(Mcb) && IsFileDeleted(Mcb->Target))
 
 /*
  * routines for reference count management
@@ -935,9 +933,6 @@ typedef struct _EXT2_CCB {
 
     // Flags
     ULONG               Flags;
-
-    // Mcb of it's symbol link
-    PEXT2_MCB           SymLink;
 
     // State that may need to be maintained
     UNICODE_STRING      DirectorySearchPattern;
@@ -2418,7 +2413,7 @@ VOID
 Ext2RemoveFcb(PEXT2_VCB Vcb, PEXT2_FCB Fcb);
 
 PEXT2_CCB
-Ext2AllocateCcb (PEXT2_MCB  SymLink);
+Ext2AllocateCcb (VOID);
 
 VOID
 Ext2FreeMcb (

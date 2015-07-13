@@ -281,7 +281,7 @@ Ext2RemoveFcb(PEXT2_VCB Vcb, PEXT2_FCB Fcb)
 }
 
 PEXT2_CCB
-Ext2AllocateCcb (PEXT2_MCB  SymLink)
+Ext2AllocateCcb (VOID)
 {
     PEXT2_CCB Ccb;
 
@@ -297,14 +297,6 @@ Ext2AllocateCcb (PEXT2_MCB  SymLink)
 
     Ccb->Identifier.Type = EXT2CCB;
     Ccb->Identifier.Size = sizeof(EXT2_CCB);
-
-    Ccb->SymLink = SymLink;
-    if (SymLink) {
-        ASSERT(SymLink->Refercount > 0);
-        Ext2ReferMcb(SymLink);
-        DEBUG(DL_INF, ( "ExtAllocateCcb: Ccb SymLink: %wZ.\n",
-                        &Ccb->SymLink->FullName));
-    }
 
     Ccb->DirectorySearchPattern.Length = 0;
     Ccb->DirectorySearchPattern.MaximumLength = 0;
@@ -324,18 +316,6 @@ Ext2FreeCcb (IN PEXT2_VCB Vcb, IN PEXT2_CCB Ccb)
            (Ccb->Identifier.Size == sizeof(EXT2_CCB)));
 
     DEBUG(DL_RES, ( "Ext2FreeCcb: Ccb = %ph.\n", Ccb));
-
-    if (Ccb->SymLink) {
-        DEBUG(DL_INF, ( "Ext2FreeCcb: Ccb SymLink: %wZ.\n",
-                        &Ccb->SymLink->FullName));
-        if (IsFileDeleted(Ccb->SymLink->Target)) {
-            Ext2UnlinkMcb(Vcb, Ccb->SymLink);
-            Ext2DerefMcb(Ccb->SymLink);
-            Ext2LinkHeadMcb(Vcb, Ccb->SymLink);
-        } else {
-            Ext2DerefMcb(Ccb->SymLink);
-        }
-    }
 
     if (Ccb->DirectorySearchPattern.Buffer != NULL) {
         DEC_MEM_COUNT(PS_DIR_PATTERN, Ccb->DirectorySearchPattern.Buffer,
