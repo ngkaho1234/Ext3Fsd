@@ -1648,7 +1648,7 @@ Ext2CreateVolume(PEXT2_IRP_CONTEXT IrpContext, PEXT2_VCB Vcb)
         return STATUS_SHARING_VIOLATION;
     }
 
-    Ccb = Ext2AllocateCcb(NULL);
+    Ccb = Ext2AllocateCcb();
     if (Ccb == NULL) {
         Status = STATUS_INSUFFICIENT_RESOURCES;
         goto errorout;
