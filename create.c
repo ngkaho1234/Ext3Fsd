@@ -670,7 +670,6 @@ Ext2CreateFile(
     PIO_STACK_LOCATION  IrpSp;
     PEXT2_FCB           Fcb = NULL;
     PEXT2_MCB           Mcb = NULL;
-    PEXT2_MCB           SymLink = NULL;
     PEXT2_CCB           Ccb = NULL;
 
     PEXT2_FCB           ParentFcb = NULL;
@@ -1197,7 +1196,7 @@ Openit:
                 __leave;
             }
 
-            if (DeleteOnClose && NULL == SymLink) {
+            if (DeleteOnClose) {
                 Status = Ext2IsFileRemovable(IrpContext, Vcb, Fcb, Ccb);
                 if (!NT_SUCCESS(Status)) {
                     __leave;
@@ -1378,7 +1377,7 @@ Openit:
                                   &(Fcb->ShareAccess) );
             }
 
-            Ccb = Ext2AllocateCcb(SymLink);
+            Ccb = Ext2AllocateCcb();
             if (!Ccb) {
                 Status = STATUS_INSUFFICIENT_RESOURCES;
                 DbgBreak();
@@ -1388,10 +1387,7 @@ Openit:
             if (DeleteOnClose)
                 SetLongFlag(Ccb->Flags, CCB_DELETE_ON_CLOSE);
 
-            if (SymLink)
-                Ccb->filp.f_dentry = SymLink->de;
-            else
-                Ccb->filp.f_dentry = Fcb->Mcb->de;
+            Ccb->filp.f_dentry = Fcb->Mcb->de;
 
             Ccb->filp.f_version = Fcb->Mcb->Inode.i_version;
             Ext2ReferXcb(&Fcb->OpenHandleCount);
@@ -1458,12 +1454,6 @@ Openit:
 
                     if (IsDirectory(Fcb)) {
                         Status = STATUS_FILE_IS_A_DIRECTORY;
-                        __leave;
-                    }
-
-                    if (SymLink != NULL) {
-                        DbgBreak();
-                        Status = STATUS_INVALID_PARAMETER;
                         __leave;
                     }
 
@@ -1602,12 +1592,6 @@ Openit:
                     Ext2FreeFcb(ParentFcb);
                 }
             }
-        }
-
-        /* drop SymLink's refer: If succeeds, Ext2AllocateCcb should refer
-           it already. It fails, we need release the refer to let it freed */
-        if (SymLink) {
-            Ext2DerefMcb(SymLink);
         }
     }
 
