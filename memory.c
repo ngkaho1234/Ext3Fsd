@@ -281,7 +281,7 @@ Ext2RemoveFcb(PEXT2_VCB Vcb, PEXT2_FCB Fcb)
 }
 
 PEXT2_CCB
-Ext2AllocateCcb (VOID)
+Ext2AllocateCcb ()
 {
     PEXT2_CCB Ccb;
 

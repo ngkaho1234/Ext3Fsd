@@ -275,7 +275,7 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
 
         if (IsFlagOn(Fcb->Flags, FCB_DELETE_PENDING)) {
 
-            if (Fcb->OpenHandleCount == 0 || (Mcb = Ccb->SymLink)) {
+            if (Fcb->OpenHandleCount == 0) {
 
                 //
                 // Ext2DeleteFile will acquire these lock inside
@@ -289,10 +289,6 @@ Ext2Cleanup (IN PEXT2_IRP_CONTEXT IrpContext)
                 //
                 //  this file is to be deleted ...
                 //
-                if (Ccb->SymLink) {
-                    Mcb = Ccb->SymLink;
-                    FileObject->DeletePending = FALSE;
-                }
 
                 Status = Ext2DeleteFile(IrpContext, Vcb, Fcb, Mcb);
 
