@@ -647,7 +647,7 @@ typedef struct _EXT2_VCB {
     LIST_ENTRY                  McbList;
 
     // Entry of Mcb Tree (Root Node)
-    PEXT2_MCB                   McbTree;
+    PEXT2_MCB                   McbTree; // (Going to be deprecated)
 
     // Link list to Global
     LIST_ENTRY                  Next;
@@ -847,6 +847,9 @@ typedef struct _EXT2_FCB {
     // Mcb Node ...
     PEXT2_MCB                       Mcb;
 
+    // Directory Entry
+    struct dentry                  *DirectoryEntry;
+
 } EXT2_FCB, *PEXT2_FCB;
 
 //
@@ -876,13 +879,13 @@ struct _EXT2_MCB {
     ULONG                           Flags;
 
     // Link List Info
-    PEXT2_MCB                       Parent; // Parent
-    PEXT2_MCB                       Next;   // Siblings
+    PEXT2_MCB                       Parent; // Parent (Going to be deprecated)
+    PEXT2_MCB                       Next;   // Siblings (Going to be deprecated)
 
     union {
         PEXT2_MCB                   Child;  // Children Mcb nodes
         PEXT2_MCB                   Target; // Target Mcb of symlink
-    };
+    }; // (Going to be deprecated)
 
     // Mcb Node Info
 
@@ -916,10 +919,10 @@ struct _EXT2_MCB {
     // List Link to Vcb->McbList
     LIST_ENTRY                      Link;
 
-	
-
+    // Inode
     struct inode                    Inode;
-    struct dentry                  *de;
+
+    struct dentry                  *de; // (Going to be deprecated)
 };
 
 //
