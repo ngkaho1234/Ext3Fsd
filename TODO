@@ -1,2 +1,3 @@
 1. Does NT support hole-punching?
 2. Inode/Namespace management rework to better support hardlink (currently access to hardlink of different link to the same inode will clash)
+3. Should we rely on Cache Manager from ntoskrnl solely? or should we continue the wrapper approach?
